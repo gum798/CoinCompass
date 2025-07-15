@@ -1,0 +1,43 @@
+{
+  "coins": [
+    "bitcoin",
+    "ethereum",
+    "ripple",
+    "solana",
+    "dogecoin"
+  ],
+  "interval": 300,
+  "rsi_oversold": 30,
+  "rsi_overbought": 70,
+  "price_change_threshold": 5.0,
+  "enable_alerts": true,
+  "log_file": "trading_log.txt",
+  "alert_conditions": {
+    "price_spike": {
+      "enabled": true,
+      "threshold": 10.0,
+      "description": "급격한 가격 변동 (10% 이상)"
+    },
+    "volume_spike": {
+      "enabled": true,
+      "threshold": 200.0,
+      "description": "거래량 급증 (평균 대비 200% 이상)"
+    },
+    "rsi_extreme": {
+      "enabled": true,
+      "oversold": 25,
+      "overbought": 75,
+      "description": "극단적 RSI 상황"
+    },
+    "bollinger_breakout": {
+      "enabled": true,
+      "description": "볼린저 밴드 돌파"
+    },
+    "moving_average_cross": {
+      "enabled": true,
+      "short_period": 5,
+      "long_period": 20,
+      "description": "이동평균선 교차"
+    }
+  }
+}
