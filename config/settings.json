@@ -1,0 +1,37 @@
+{
+  "monitoring": {
+    "interval_seconds": 1800,
+    "coins": [
+      "bitcoin",
+      "ethereum",
+      "ripple",
+      "solana",
+      "dogecoin"
+    ],
+    "rsi_oversold": 30.0,
+    "rsi_overbought": 70.0,
+    "price_change_threshold": 5.0,
+    "enable_alerts": true
+  },
+  "api": {
+    "coingecko_api_key": null,
+    "coinmarketcap_api_key": null,
+    "request_timeout": 10,
+    "max_retries": 3,
+    "rate_limit_buffer": 0.1
+  },
+  "data": {
+    "cache_timeout_minutes": 5,
+    "data_retention_days": 30,
+    "auto_cleanup": true,
+    "backup_enabled": true
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file_enabled": true,
+    "file_path": "coincompass.log",
+    "max_file_size_mb": 10,
+    "backup_count": 5
+  }
+}
