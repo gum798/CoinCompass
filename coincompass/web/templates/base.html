@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CoinCompass - 스마트 암호화폐 대시보드{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Socket.IO -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #2c5aa0;
+            --secondary-color: #f8f9fa;
+            --success-color: #198754;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #0dcaf0;
+            --dark-color: #212529;
+        }
+        
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease-in-out;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .price-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .price-positive {
+            color: #198754 !important;
+        }
+        
+        .price-negative {
+            color: #dc3545 !important;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-online {
+            background-color: #198754;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-offline {
+            background-color: #dc3545;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        
+        .metric-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        
+        .alert-card {
+            border-left: 4px solid #ffc107;
+            background-color: #fff3cd;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        .loading-spinner {
+            display: none;
+        }
+        
+        .loading .loading-spinner {
+            display: inline-block;
+        }
+        
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(180deg, #2c5aa0 0%, #1e3a6f 100%);
+        }
+        
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            color: white;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+        }
+        
+        .main-content {
+            padding: 2rem;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                min-height: auto;
+            }
+            
+            .main-content {
+                padding: 1rem;
+            }
+            
+            .metric-value {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-compass me-2"></i>CoinCompass
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="fas fa-chart-line me-1"></i>대시보드
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('settings') }}">
+                            <i class="fas fa-cog me-1"></i>설정
+                        </a>
+                    </li>
+                </ul>
+                
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <span class="navbar-text">
+                            <span id="connection-status" class="status-indicator status-offline"></span>
+                            <span id="connection-text">연결 중...</span>
+                        </span>
+                    </li>
+                    <li class="nav-item">
+                        <span class="navbar-text me-3">
+                            <i class="fas fa-clock me-1"></i>
+                            <span id="last-update">-</span>
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid">
+        <div class="row">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <!-- Alerts Container -->
+    <div id="alerts-container" class="position-fixed top-0 end-0 p-3" style="z-index: 1050;">
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Socket.IO 연결 및 기본 스크립트 -->
+    <script>
+        // Socket.IO 연결
+        const socket = io();
+        
+        // 연결 상태 관리
+        socket.on('connect', function() {
+            updateConnectionStatus(true);
+        });
+        
+        socket.on('disconnect', function() {
+            updateConnectionStatus(false);
+        });
+        
+        // 연결 상태 업데이트
+        function updateConnectionStatus(connected) {
+            const statusIndicator = document.getElementById('connection-status');
+            const statusText = document.getElementById('connection-text');
+            
+            if (connected) {
+                statusIndicator.className = 'status-indicator status-online';
+                statusText.textContent = '실시간 연결';
+            } else {
+                statusIndicator.className = 'status-indicator status-offline';
+                statusText.textContent = '연결 끊김';
+            }
+        }
+        
+        // 마지막 업데이트 시간 표시
+        function updateLastUpdateTime(timestamp) {
+            const element = document.getElementById('last-update');
+            if (timestamp) {
+                const date = new Date(timestamp);
+                element.textContent = date.toLocaleTimeString('ko-KR');
+            }
+        }
+        
+        // 알림 표시
+        function showAlert(message, type = 'info', duration = 5000) {
+            const alertsContainer = document.getElementById('alerts-container');
+            const alertId = 'alert-' + Date.now();
+            
+            const alertHtml = `
+                <div id="${alertId}" class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    <strong>${type === 'danger' ? '오류' : type === 'warning' ? '경고' : type === 'success' ? '성공' : '알림'}!</strong>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            
+            alertsContainer.insertAdjacentHTML('beforeend', alertHtml);
+            
+            // 자동 제거
+            setTimeout(() => {
+                const alertElement = document.getElementById(alertId);
+                if (alertElement) {
+                    alertElement.remove();
+                }
+            }, duration);
+        }
+        
+        // 가격 변동 색상 적용
+        function getPriceChangeClass(change) {
+            return change >= 0 ? 'price-positive' : 'price-negative';
+        }
+        
+        // 가격 포맷팅
+        function formatPrice(price) {
+            if (price >= 1000) {
+                return '$' + price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            } else {
+                return '$' + price.toFixed(4);
+            }
+        }
+        
+        // 퍼센트 포맷팅
+        function formatPercent(percent) {
+            const sign = percent >= 0 ? '+' : '';
+            return sign + percent.toFixed(2) + '%';
+        }
+        
+        // 알림 수신
+        socket.on('alert', function(alert) {
+            const alertType = alert.severity === 'high' ? 'warning' : 'info';
+            showAlert(alert.message, alertType);
+        });
+        
+        // 오류 수신
+        socket.on('error', function(error) {
+            showAlert(error.message, 'danger');
+        });
+        
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            // 툴팁 활성화
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

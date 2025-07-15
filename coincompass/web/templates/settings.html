@@ -1,0 +1,596 @@
+{% extends "base.html" %}
+
+{% block title %}설정 - CoinCompass 대시보드{% endblock %}
+
+{% block content %}
+<div class="col-12">
+    <!-- 페이지 헤더 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3">
+                <i class="fas fa-cog me-2"></i>대시보드 설정
+            </h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">대시보드</a></li>
+                    <li class="breadcrumb-item active">설정</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <!-- 설정 탭 -->
+    <div class="row">
+        <div class="col-12">
+            <ul class="nav nav-tabs" id="settingsTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="monitoring-tab" data-bs-toggle="tab" data-bs-target="#monitoring" type="button" role="tab">
+                        <i class="fas fa-tachometer-alt me-1"></i>모니터링 설정
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="alerts-tab" data-bs-toggle="tab" data-bs-target="#alerts" type="button" role="tab">
+                        <i class="fas fa-bell me-1"></i>알림 설정
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="api-tab" data-bs-toggle="tab" data-bs-target="#api" type="button" role="tab">
+                        <i class="fas fa-key me-1"></i>API 키 관리
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 탭 콘텐츠 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="tab-content" id="settingsTabsContent">
+                
+                <!-- 모니터링 설정 탭 -->
+                <div class="tab-pane fade show active" id="monitoring" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-tachometer-alt me-2"></i>실시간 모니터링 설정
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="monitoring-form">
+                                <!-- 모니터링 활성화 -->
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="monitoring-enabled" {{ 'checked' if settings.enabled else '' }}>
+                                            <label class="form-check-label" for="monitoring-enabled">
+                                                <strong>실시간 모니터링 활성화</strong>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">실시간 가격 및 지표 업데이트를 활성화합니다</small>
+                                    </div>
+                                </div>
+
+                                <!-- 업데이트 간격 -->
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <label for="monitoring-interval" class="form-label">업데이트 간격 (초)</label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="monitoring-interval" 
+                                                   value="{{ settings.interval }}" min="10" max="300" step="5">
+                                            <span class="input-group-text">초</span>
+                                        </div>
+                                        <small class="text-muted">최소 10초, 최대 300초 (5분)</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="alert alert-info">
+                                            <i class="fas fa-info-circle me-2"></i>
+                                            <strong>권장 설정:</strong><br>
+                                            • 실시간 트레이딩: 10-30초<br>
+                                            • 일반 모니터링: 60-180초<br>
+                                            • 장기 투자: 300초
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 모니터링 코인 선택 -->
+                                <div class="row mb-4">
+                                    <div class="col-12">
+                                        <label class="form-label">모니터링 대상 코인</label>
+                                        <div class="row">
+                                            <div class="col-md-4 mb-2">
+                                                <div class="form-check">
+                                                    <input class="form-check-input coin-checkbox" type="checkbox" value="bitcoin" id="coin-bitcoin" 
+                                                           {{ 'checked' if 'bitcoin' in settings.coins else '' }}>
+                                                    <label class="form-check-label" for="coin-bitcoin">
+                                                        Bitcoin (BTC)
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <div class="form-check">
+                                                    <input class="form-check-input coin-checkbox" type="checkbox" value="ethereum" id="coin-ethereum"
+                                                           {{ 'checked' if 'ethereum' in settings.coins else '' }}>
+                                                    <label class="form-check-label" for="coin-ethereum">
+                                                        Ethereum (ETH)
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <div class="form-check">
+                                                    <input class="form-check-input coin-checkbox" type="checkbox" value="ripple" id="coin-ripple"
+                                                           {{ 'checked' if 'ripple' in settings.coins else '' }}>
+                                                    <label class="form-check-label" for="coin-ripple">
+                                                        Ripple (XRP)
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <div class="form-check">
+                                                    <input class="form-check-input coin-checkbox" type="checkbox" value="cardano" id="coin-cardano"
+                                                           {{ 'checked' if 'cardano' in settings.coins else '' }}>
+                                                    <label class="form-check-label" for="coin-cardano">
+                                                        Cardano (ADA)
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <div class="form-check">
+                                                    <input class="form-check-input coin-checkbox" type="checkbox" value="solana" id="coin-solana"
+                                                           {{ 'checked' if 'solana' in settings.coins else '' }}>
+                                                    <label class="form-check-label" for="coin-solana">
+                                                        Solana (SOL)
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <div class="form-check">
+                                                    <input class="form-check-input coin-checkbox" type="checkbox" value="polkadot" id="coin-polkadot"
+                                                           {{ 'checked' if 'polkadot' in settings.coins else '' }}>
+                                                    <label class="form-check-label" for="coin-polkadot">
+                                                        Polkadot (DOT)
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">최소 1개 이상 선택해주세요</small>
+                                    </div>
+                                </div>
+
+                                <!-- 저장 버튼 -->
+                                <div class="row">
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-save me-1"></i>모니터링 설정 저장
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary ms-2" onclick="resetMonitoringForm()">
+                                            <i class="fas fa-undo me-1"></i>초기화
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 알림 설정 탭 -->
+                <div class="tab-pane fade" id="alerts" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-bell me-2"></i>알림 조건 설정
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="alerts-form">
+                                <!-- 가격 변동 알림 -->
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <label for="price-change-threshold" class="form-label">가격 변동 알림 기준</label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="price-change-threshold" 
+                                                   value="{{ settings.alerts.price_change_threshold }}" min="1" max="50" step="0.5">
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                        <small class="text-muted">24시간 변동률이 이 값을 초과하면 알림</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="volume-change-threshold" class="form-label">거래량 변동 알림 기준</label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="volume-change-threshold" 
+                                                   value="{{ settings.alerts.volume_change_threshold }}" min="10" max="200" step="5">
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                        <small class="text-muted">평균 거래량 대비 변동률 기준</small>
+                                    </div>
+                                </div>
+
+                                <!-- 기술적 지표 알림 -->
+                                <div class="row mb-4">
+                                    <div class="col-12">
+                                        <h6>기술적 지표 알림</h6>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="rsi-alerts" checked>
+                                            <label class="form-check-label" for="rsi-alerts">
+                                                RSI 과매수/과매도 알림
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">RSI > 70 (과매수) 또는 RSI < 30 (과매도)</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="macd-alerts" checked>
+                                            <label class="form-check-label" for="macd-alerts">
+                                                MACD 신호 알림
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">골든크로스/데드크로스 신호</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="bb-alerts" checked>
+                                            <label class="form-check-label" for="bb-alerts">
+                                                볼린저 밴드 돌파 알림
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">상단/하단 밴드 돌파</small>
+                                    </div>
+                                </div>
+
+                                <!-- 거시경제 지표 알림 -->
+                                <div class="row mb-4">
+                                    <div class="col-12">
+                                        <h6>거시경제 지표 알림</h6>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="fed-rate-alerts">
+                                            <label class="form-check-label" for="fed-rate-alerts">
+                                                연방기금금리 변동 알림
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">FRED API 키 필요</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="vix-alerts" checked>
+                                            <label class="form-check-label" for="vix-alerts">
+                                                VIX 급등 알림 (>30)
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">시장 불안감 증가 신호</small>
+                                    </div>
+                                </div>
+
+                                <!-- 저장 버튼 -->
+                                <div class="row">
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-save me-1"></i>알림 설정 저장
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary ms-2" onclick="resetAlertsForm()">
+                                            <i class="fas fa-undo me-1"></i>초기화
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API 키 관리 탭 -->
+                <div class="tab-pane fade" id="api" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-key me-2"></i>API 키 관리
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- FRED API 키 -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6>FRED API 키 설정</h6>
+                                    <p class="text-muted">
+                                        거시경제 지표 분석을 위해 
+                                        <a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank" class="text-decoration-none">
+                                            FRED API 키 <i class="fas fa-external-link-alt"></i>
+                                        </a>를 설정하세요.
+                                    </p>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <div class="alert alert-{{ 'success' if fred_key_exists else 'warning' }}">
+                                                <i class="fas fa-{{ 'check-circle' if fred_key_exists else 'exclamation-triangle' }} me-2"></i>
+                                                <strong>상태:</strong> 
+                                                {{ 'FRED API 키가 설정되었습니다' if fred_key_exists else 'FRED API 키가 설정되지 않았습니다' }}
+                                            </div>
+                                            
+                                            <form id="fred-key-form">
+                                                <div class="input-group mb-3">
+                                                    <input type="text" class="form-control" id="fred-api-key" 
+                                                           placeholder="FRED API 키를 입력하세요" maxlength="32">
+                                                    <button type="submit" class="btn btn-primary">
+                                                        <i class="fas fa-save me-1"></i>저장
+                                                    </button>
+                                                </div>
+                                            </form>
+                                            
+                                            {% if fred_key_exists %}
+                                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="testFredApi()">
+                                                <i class="fas fa-vial me-1"></i>연결 테스트
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="card bg-light">
+                                                <div class="card-body">
+                                                    <h6 class="card-title">
+                                                        <i class="fas fa-info-circle me-1"></i>FRED API 혜택
+                                                    </h6>
+                                                    <ul class="list-unstyled mb-0">
+                                                        <li><i class="fas fa-check text-success me-1"></i>연방기금금리</li>
+                                                        <li><i class="fas fa-check text-success me-1"></i>실업률</li>
+                                                        <li><i class="fas fa-check text-success me-1"></i>소비자물가지수</li>
+                                                        <li><i class="fas fa-check text-success me-1"></i>GDP 성장률</li>
+                                                        <li><i class="fas fa-check text-success me-1"></i>국채 수익률</li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- API 사용량 정보 -->
+                            <div class="row">
+                                <div class="col-12">
+                                    <h6>API 사용량 현황</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>API 서비스</th>
+                                                    <th>상태</th>
+                                                    <th>월간 한도</th>
+                                                    <th>요금</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td>CoinGecko</td>
+                                                    <td><span class="badge bg-success">활성</span></td>
+                                                    <td>10,000 호출</td>
+                                                    <td>무료</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>CoinPaprika</td>
+                                                    <td><span class="badge bg-success">활성</span></td>
+                                                    <td>25,000 호출</td>
+                                                    <td>무료</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>FRED</td>
+                                                    <td><span class="badge bg-{{ 'success' if fred_key_exists else 'secondary' }}">{{ '활성' if fred_key_exists else '비활성' }}</span></td>
+                                                    <td>120,000 호출</td>
+                                                    <td>무료</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Yahoo Finance</td>
+                                                    <td><span class="badge bg-success">활성</span></td>
+                                                    <td>무제한</td>
+                                                    <td>무료</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 모니터링 설정 폼 제출
+    document.getElementById('monitoring-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            enabled: document.getElementById('monitoring-enabled').checked,
+            interval: parseInt(document.getElementById('monitoring-interval').value),
+            coins: Array.from(document.querySelectorAll('.coin-checkbox:checked')).map(cb => cb.value)
+        };
+        
+        if (formData.coins.length === 0) {
+            showAlert('최소 1개 이상의 코인을 선택해주세요.', 'warning');
+            return;
+        }
+        
+        saveSettings('monitoring', formData);
+    });
+    
+    // 알림 설정 폼 제출
+    document.getElementById('alerts-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            alerts: {
+                price_change_threshold: parseFloat(document.getElementById('price-change-threshold').value),
+                volume_change_threshold: parseFloat(document.getElementById('volume-change-threshold').value),
+                rsi_alerts: document.getElementById('rsi-alerts').checked,
+                macd_alerts: document.getElementById('macd-alerts').checked,
+                bb_alerts: document.getElementById('bb-alerts').checked,
+                fed_rate_alerts: document.getElementById('fed-rate-alerts').checked,
+                vix_alerts: document.getElementById('vix-alerts').checked
+            }
+        };
+        
+        saveSettings('alerts', formData);
+    });
+    
+    // FRED API 키 폼 제출
+    document.getElementById('fred-key-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const apiKey = document.getElementById('fred-api-key').value.trim();
+        
+        if (!apiKey) {
+            showAlert('API 키를 입력하세요.', 'warning');
+            return;
+        }
+        
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalHtml = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>저장 중...';
+        submitBtn.disabled = true;
+        
+        fetch('/api/fred-key', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ api_key: apiKey })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(data.message, 'success');
+                document.getElementById('fred-api-key').value = '';
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showAlert(data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('API 키 저장 중 오류가 발생했습니다.', 'danger');
+        })
+        .finally(() => {
+            submitBtn.innerHTML = originalHtml;
+            submitBtn.disabled = false;
+        });
+    });
+    
+    // 설정 저장 함수
+    function saveSettings(type, data) {
+        const submitBtn = document.querySelector(`#${type}-form button[type="submit"]`);
+        const originalHtml = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>저장 중...';
+        submitBtn.disabled = true;
+        
+        fetch('/api/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('설정이 저장되었습니다.', 'success');
+                
+                // 모니터링 설정이 변경된 경우 소켓 이벤트 발송
+                if (type === 'monitoring') {
+                    if (data.settings.enabled) {
+                        socket.emit('start_monitoring');
+                    } else {
+                        socket.emit('stop_monitoring');
+                    }
+                }
+            } else {
+                showAlert(data.error || '설정 저장에 실패했습니다.', 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('설정 저장 중 오류가 발생했습니다.', 'danger');
+        })
+        .finally(() => {
+            submitBtn.innerHTML = originalHtml;
+            submitBtn.disabled = false;
+        });
+    }
+    
+    // 모니터링 설정 초기화
+    function resetMonitoringForm() {
+        document.getElementById('monitoring-enabled').checked = {{ 'true' if settings.enabled else 'false' }};
+        document.getElementById('monitoring-interval').value = {{ settings.interval }};
+        
+        // 코인 체크박스 초기화
+        document.querySelectorAll('.coin-checkbox').forEach(cb => {
+            cb.checked = {{ settings.coins|tojsonfilter }}.includes(cb.value);
+        });
+        
+        showAlert('모니터링 설정이 초기화되었습니다.', 'info');
+    }
+    
+    // 알림 설정 초기화
+    function resetAlertsForm() {
+        document.getElementById('price-change-threshold').value = {{ settings.alerts.price_change_threshold }};
+        document.getElementById('volume-change-threshold').value = {{ settings.alerts.volume_change_threshold }};
+        document.getElementById('rsi-alerts').checked = true;
+        document.getElementById('macd-alerts').checked = true;
+        document.getElementById('bb-alerts').checked = true;
+        document.getElementById('fed-rate-alerts').checked = false;
+        document.getElementById('vix-alerts').checked = true;
+        
+        showAlert('알림 설정이 초기화되었습니다.', 'info');
+    }
+    
+    // FRED API 연결 테스트
+    function testFredApi() {
+        const testBtn = event.target;
+        const originalHtml = testBtn.innerHTML;
+        testBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>테스트 중...';
+        testBtn.disabled = true;
+        
+        // 간단한 FRED API 테스트 (연방기금금리 조회)
+        fetch('/api/macro')
+        .then(response => response.json())
+        .then(data => {
+            if (data.fed_rate && data.fed_rate.value !== 'N/A') {
+                showAlert(`FRED API 연결 성공! 현재 연방기금금리: ${data.fed_rate.value}%`, 'success');
+            } else {
+                showAlert('FRED API 연결은 성공했지만 데이터를 가져올 수 없습니다.', 'warning');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('FRED API 연결 테스트에 실패했습니다.', 'danger');
+        })
+        .finally(() => {
+            testBtn.innerHTML = originalHtml;
+            testBtn.disabled = false;
+        });
+    }
+    
+    // 페이지 로드 시 설정 로드
+    document.addEventListener('DOMContentLoaded', function() {
+        // 탭 전환 시 URL 해시 업데이트
+        const tabTriggerList = [].slice.call(document.querySelectorAll('#settingsTabs button'));
+        tabTriggerList.forEach(function (tabTrigger) {
+            tabTrigger.addEventListener('click', function(event) {
+                const target = event.target.getAttribute('data-bs-target');
+                window.location.hash = target;
+            });
+        });
+        
+        // URL 해시에 따라 탭 활성화
+        if (window.location.hash) {
+            const targetTab = document.querySelector(`button[data-bs-target="${window.location.hash}"]`);
+            if (targetTab) {
+                const tab = new bootstrap.Tab(targetTab);
+                tab.show();
+            }
+        }
+    });
+</script>
+{% endblock %}
