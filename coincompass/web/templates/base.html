@@ -100,6 +100,11 @@
         .chart-container {
             position: relative;
             height: 300px;
+            width: 100%;
+        }
+        
+        .chart-container canvas {
+            max-height: 300px;
         }
         
         .loading-spinner {
@@ -129,6 +134,16 @@
         
         .main-content {
             padding: 2rem;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .alert-sm {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.875rem;
         }
         
         @media (max-width: 768px) {
@@ -165,6 +180,11 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('index') }}">
                             <i class="fas fa-chart-line me-1"></i>대시보드
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('simulation') }}">
+                            <i class="fas fa-gamepad me-1"></i>모의투자
                         </a>
                     </li>
                     <li class="nav-item">
@@ -208,17 +228,22 @@
     
     <!-- Socket.IO 연결 및 기본 스크립트 -->
     <script>
-        // Socket.IO 연결
-        const socket = io();
+        // Socket.IO 연결 (있을 때만)
+        const socket = typeof io !== 'undefined' ? io() : null;
         
-        // 연결 상태 관리
-        socket.on('connect', function() {
-            updateConnectionStatus(true);
-        });
-        
-        socket.on('disconnect', function() {
+        // 연결 상태 관리 (Socket이 있을 때만)
+        if (socket) {
+            socket.on('connect', function() {
+                updateConnectionStatus(true);
+            });
+            
+            socket.on('disconnect', function() {
+                updateConnectionStatus(false);
+            });
+        } else {
+            // Socket.IO가 없을 때는 연결 안됨으로 표시
             updateConnectionStatus(false);
-        });
+        }
         
         // 연결 상태 업데이트
         function updateConnectionStatus(connected) {
@@ -287,16 +312,23 @@
             return sign + percent.toFixed(2) + '%';
         }
         
-        // 알림 수신
-        socket.on('alert', function(alert) {
-            const alertType = alert.severity === 'high' ? 'warning' : 'info';
-            showAlert(alert.message, alertType);
-        });
-        
-        // 오류 수신
-        socket.on('error', function(error) {
-            showAlert(error.message, 'danger');
-        });
+        // 알림 수신 (Socket이 있을 때만)
+        if (socket) {
+            socket.on('alert', function(alert) {
+                const alertType = alert.severity === 'high' ? 'warning' : 'info';
+                showAlert(alert.message, alertType);
+                
+                // 신호 리스트에도 알림 추가
+                if (typeof addAlertToSignalsList === 'function') {
+                    addAlertToSignalsList(alert);
+                }
+            });
+            
+            // 오류 수신
+            socket.on('error', function(error) {
+                showAlert(error.message, 'danger');
+            });
+        }
         
         // 페이지 로드 시 초기화
         document.addEventListener('DOMContentLoaded', function() {

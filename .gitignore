@@ -62,3 +62,9 @@ config/api_keys.json
 # Temporary files
 *.tmp
 temp/
+
+# Vercel
+.vercel
+
+# Test files
+test_*.html

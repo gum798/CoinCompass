@@ -1,0 +1,523 @@
+{% extends "base.html" %}
+
+{% block title %}모의투자 시뮬레이션 - CoinCompass{% endblock %}
+
+{% block content %}
+<div class="col-12">
+    <!-- 포트폴리오 요약 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-wallet me-2"></i>포트폴리오 요약
+                        </h5>
+                        <div>
+                            <button id="refresh-portfolio" class="btn btn-outline-primary btn-sm me-2">
+                                <i class="fas fa-sync-alt me-1"></i>새로고침
+                            </button>
+                            <button id="reset-portfolio" class="btn btn-outline-danger btn-sm">
+                                <i class="fas fa-undo me-1"></i>리셋
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <div class="text-center">
+                                <div class="metric-label">총 포트폴리오 가치</div>
+                                <div id="total-portfolio-value" class="metric-value text-primary">$0.00</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="text-center">
+                                <div class="metric-label">현금 잔고</div>
+                                <div id="cash-balance" class="metric-value">$0.00</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="text-center">
+                                <div class="metric-label">총 손익</div>
+                                <div id="total-profit-loss" class="metric-value">$0.00</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="text-center">
+                                <div class="metric-label">수익률</div>
+                                <div id="profit-loss-percent" class="metric-value">0.00%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 거래 패널 -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <!-- 보유 포지션 -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-coins me-2"></i>보유 포지션
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="positions-table">
+                        <div class="text-center text-muted">
+                            아직 보유한 암호화폐가 없습니다.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 거래 내역 -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history me-2"></i>거래 내역
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="orders-table">
+                        <div class="text-center text-muted">
+                            거래 내역이 없습니다.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- 거래 패널 -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exchange-alt me-2"></i>거래
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- 매수 -->
+                    <div class="mb-4">
+                        <h6 class="text-success">
+                            <i class="fas fa-arrow-up me-1"></i>매수
+                        </h6>
+                        <div class="mb-3">
+                            <label class="form-label">코인 선택</label>
+                            <select id="buy-coin" class="form-select">
+                                <option value="">코인을 선택하세요</option>
+                                {% for coin in coins %}
+                                <option value="{{ coin }}">{{ coin.upper() }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">투자 금액 (USD)</label>
+                            <input type="number" id="buy-amount" class="form-control" placeholder="0.00" min="0" step="0.01">
+                        </div>
+                        <button id="buy-button" class="btn btn-success w-100">
+                            <i class="fas fa-shopping-cart me-1"></i>매수
+                        </button>
+                    </div>
+
+                    <hr>
+
+                    <!-- 매도 -->
+                    <div class="mb-4">
+                        <h6 class="text-danger">
+                            <i class="fas fa-arrow-down me-1"></i>매도
+                        </h6>
+                        <div class="mb-3">
+                            <label class="form-label">보유 코인</label>
+                            <select id="sell-coin" class="form-select">
+                                <option value="">보유 코인이 없습니다</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">매도 비율 (%)</label>
+                            <input type="range" id="sell-percentage" class="form-range" min="1" max="100" value="50">
+                            <div class="d-flex justify-content-between">
+                                <small>1%</small>
+                                <span id="sell-percentage-value" class="fw-bold">50%</span>
+                                <small>100%</small>
+                            </div>
+                        </div>
+                        <button id="sell-button" class="btn btn-danger w-100" disabled>
+                            <i class="fas fa-hand-holding-usd me-1"></i>매도
+                        </button>
+                    </div>
+
+                    <!-- 빠른 거래 버튼 -->
+                    <div class="row">
+                        <div class="col-4">
+                            <button class="btn btn-outline-success btn-sm w-100" onclick="setQuickAmount(100)">
+                                $100
+                            </button>
+                        </div>
+                        <div class="col-4">
+                            <button class="btn btn-outline-success btn-sm w-100" onclick="setQuickAmount(500)">
+                                $500
+                            </button>
+                        </div>
+                        <div class="col-4">
+                            <button class="btn btn-outline-success btn-sm w-100" onclick="setQuickAmount(1000)">
+                                $1000
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 주문 확인 모달 -->
+<div class="modal fade" id="orderModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">주문 확인</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="order-details"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                <button type="button" id="confirm-order" class="btn btn-primary">주문 확인</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let portfolioData = {};
+    let ordersData = [];
+    let currentPrices = {};
+
+    // 페이지 로드 시 초기화
+    document.addEventListener('DOMContentLoaded', function() {
+        loadPortfolio();
+        loadOrders();
+        setupEventListeners();
+        
+        // 30초마다 포트폴리오 업데이트
+        setInterval(loadPortfolio, 30000);
+    });
+
+    function setupEventListeners() {
+        // 버튼 이벤트
+        document.getElementById('refresh-portfolio').addEventListener('click', loadPortfolio);
+        document.getElementById('reset-portfolio').addEventListener('click', resetPortfolio);
+        document.getElementById('buy-button').addEventListener('click', handleBuyOrder);
+        document.getElementById('sell-button').addEventListener('click', handleSellOrder);
+        
+        // 매도 비율 슬라이더
+        document.getElementById('sell-percentage').addEventListener('input', function() {
+            document.getElementById('sell-percentage-value').textContent = this.value + '%';
+        });
+        
+        // 매도 코인 선택 변경
+        document.getElementById('sell-coin').addEventListener('change', function() {
+            const sellButton = document.getElementById('sell-button');
+            sellButton.disabled = this.value === '';
+        });
+    }
+
+    function loadPortfolio() {
+        fetch('/api/simulation/portfolio')
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showAlert(data.error, 'danger');
+                    return;
+                }
+                
+                portfolioData = data;
+                updatePortfolioDisplay();
+                updatePositionsTable();
+                updateSellCoinOptions();
+            })
+            .catch(error => {
+                console.error('포트폴리오 로드 오류:', error);
+                showAlert('포트폴리오 정보를 불러오는데 실패했습니다.', 'danger');
+            });
+    }
+
+    function updatePortfolioDisplay() {
+        const portfolio = portfolioData.portfolio;
+        
+        document.getElementById('total-portfolio-value').textContent = 
+            formatCurrency(portfolio.total_portfolio_value);
+        document.getElementById('cash-balance').textContent = 
+            formatCurrency(portfolio.cash_balance);
+        
+        const profitLoss = portfolio.total_profit_loss;
+        const profitLossPercent = portfolio.total_profit_loss_percent;
+        
+        const profitLossElement = document.getElementById('total-profit-loss');
+        const profitLossPercentElement = document.getElementById('profit-loss-percent');
+        
+        profitLossElement.textContent = formatCurrency(profitLoss);
+        profitLossPercentElement.textContent = profitLossPercent.toFixed(2) + '%';
+        
+        // 손익에 따라 색상 변경
+        const colorClass = profitLoss >= 0 ? 'text-success' : 'text-danger';
+        profitLossElement.className = `metric-value ${colorClass}`;
+        profitLossPercentElement.className = `metric-value ${colorClass}`;
+    }
+
+    function updatePositionsTable() {
+        const positions = portfolioData.portfolio.positions;
+        const container = document.getElementById('positions-table');
+        
+        if (positions.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted">아직 보유한 암호화폐가 없습니다.</div>';
+            return;
+        }
+        
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>코인</th>
+                            <th>수량</th>
+                            <th>평단가</th>
+                            <th>현재가</th>
+                            <th>평가액</th>
+                            <th>손익</th>
+                            <th>수익률</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        positions.forEach(position => {
+            const profitLossClass = position.profit_loss >= 0 ? 'text-success' : 'text-danger';
+            
+            html += `
+                <tr>
+                    <td><strong>${position.coin_id.toUpperCase()}</strong></td>
+                    <td>${position.quantity.toFixed(6)}</td>
+                    <td>${formatCurrency(position.average_price)}</td>
+                    <td>${formatCurrency(position.current_price)}</td>
+                    <td>${formatCurrency(position.current_value)}</td>
+                    <td class="${profitLossClass}">${formatCurrency(position.profit_loss)}</td>
+                    <td class="${profitLossClass}">${position.profit_loss_percent.toFixed(2)}%</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+    }
+
+    function updateSellCoinOptions() {
+        const positions = portfolioData.portfolio.positions;
+        const sellCoinSelect = document.getElementById('sell-coin');
+        
+        sellCoinSelect.innerHTML = '<option value="">보유 코인이 없습니다</option>';
+        
+        positions.forEach(position => {
+            const option = document.createElement('option');
+            option.value = position.coin_id;
+            option.textContent = `${position.coin_id.toUpperCase()} (${position.quantity.toFixed(6)})`;
+            sellCoinSelect.appendChild(option);
+        });
+    }
+
+    function loadOrders() {
+        fetch('/api/simulation/orders')
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showAlert(data.error, 'danger');
+                    return;
+                }
+                
+                ordersData = data.orders;
+                updateOrdersTable();
+            })
+            .catch(error => {
+                console.error('주문 내역 로드 오류:', error);
+            });
+    }
+
+    function updateOrdersTable() {
+        const container = document.getElementById('orders-table');
+        
+        if (ordersData.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted">거래 내역이 없습니다.</div>';
+            return;
+        }
+        
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>시간</th>
+                            <th>코인</th>
+                            <th>타입</th>
+                            <th>수량</th>
+                            <th>가격</th>
+                            <th>상태</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        ordersData.forEach(order => {
+            const statusClass = order.status === 'EXECUTED' ? 'text-success' : 
+                               order.status === 'FAILED' ? 'text-danger' : 'text-warning';
+            const typeClass = order.order_type === 'BUY' ? 'text-success' : 'text-danger';
+            
+            html += `
+                <tr>
+                    <td>${formatDateTime(order.created_at)}</td>
+                    <td><strong>${order.coin_id.toUpperCase()}</strong></td>
+                    <td class="${typeClass}">${order.order_type}</td>
+                    <td>${order.quantity.toFixed(6)}</td>
+                    <td>${formatCurrency(order.price)}</td>
+                    <td class="${statusClass}">${order.status}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+    }
+
+    function handleBuyOrder() {
+        const coinId = document.getElementById('buy-coin').value;
+        const amount = parseFloat(document.getElementById('buy-amount').value);
+        
+        if (!coinId || !amount || amount <= 0) {
+            showAlert('코인과 투자 금액을 올바르게 입력하세요.', 'warning');
+            return;
+        }
+        
+        if (amount > portfolioData.portfolio.cash_balance) {
+            showAlert('현금 잔고가 부족합니다.', 'warning');
+            return;
+        }
+        
+        // 주문 실행
+        fetch('/api/simulation/buy', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                coin_id: coinId,
+                amount: amount
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(data.message, 'success');
+                
+                // 입력 필드 초기화
+                document.getElementById('buy-coin').value = '';
+                document.getElementById('buy-amount').value = '';
+                
+                // 포트폴리오 새로고침
+                loadPortfolio();
+                loadOrders();
+            } else {
+                showAlert(data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('매수 주문 오류:', error);
+            showAlert('매수 주문 처리 중 오류가 발생했습니다.', 'danger');
+        });
+    }
+
+    function handleSellOrder() {
+        const coinId = document.getElementById('sell-coin').value;
+        const percentage = parseFloat(document.getElementById('sell-percentage').value);
+        
+        if (!coinId || !percentage || percentage <= 0) {
+            showAlert('코인과 매도 비율을 올바르게 선택하세요.', 'warning');
+            return;
+        }
+        
+        // 주문 실행
+        fetch('/api/simulation/sell', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                coin_id: coinId,
+                percentage: percentage
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(data.message, 'success');
+                
+                // 포트폴리오 새로고침
+                loadPortfolio();
+                loadOrders();
+            } else {
+                showAlert(data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('매도 주문 오류:', error);
+            showAlert('매도 주문 처리 중 오류가 발생했습니다.', 'danger');
+        });
+    }
+
+    function resetPortfolio() {
+        if (!confirm('포트폴리오를 리셋하시겠습니까? 모든 거래 내역이 삭제됩니다.')) {
+            return;
+        }
+        
+        fetch('/api/simulation/reset', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert(data.message, 'success');
+                loadPortfolio();
+                loadOrders();
+            } else {
+                showAlert(data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('리셋 오류:', error);
+            showAlert('포트폴리오 리셋 중 오류가 발생했습니다.', 'danger');
+        });
+    }
+
+    function setQuickAmount(amount) {
+        document.getElementById('buy-amount').value = amount;
+    }
+
+    function formatCurrency(amount) {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(amount);
+    }
+
+    function formatDateTime(dateString) {
+        return new Date(dateString).toLocaleString('ko-KR');
+    }
+</script>
+{% endblock %}

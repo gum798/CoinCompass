@@ -76,6 +76,7 @@ class APIKeyManager:
                     f.write(encrypted_data)
             else:
                 # 평문으로 저장 (fallback)
+                logger.warning("암호화 라이브러리가 없어 평문으로 API 키를 저장합니다")
                 plaintext_file = self.config_dir / 'api_keys.json'
                 with open(plaintext_file, 'w', encoding='utf-8') as f:
                     json.dump(api_keys, f, indent=2)
@@ -174,8 +175,6 @@ class SimplePlaintextAPIKeyManager:
         self.config_dir.mkdir(exist_ok=True)
         
         self.key_file = self.config_dir / 'api_keys.json'
-        
-        logger.warning("암호화 라이브러리가 없어 평문으로 API 키를 저장합니다")
     
     def save_api_key(self, service: str, api_key: str) -> bool:
         """API 키 저장 (평문)"""
@@ -257,6 +256,7 @@ def get_api_key_manager():
     if CRYPTOGRAPHY_AVAILABLE:
         return APIKeyManager()
     else:
+        logger.warning("암호화 라이브러리가 없어 평문으로 API 키를 저장합니다")
         return SimplePlaintextAPIKeyManager()
 
 def demo_api_key_management():

@@ -70,9 +70,44 @@
         <div class="col-lg-8">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="fas fa-chart-line me-2"></i>실시간 가격 차트
-                    </h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0">
+                                <i class="fas fa-chart-line me-2"></i>실시간 변동률 차트
+                            </h5>
+                            <small class="text-muted">각 코인의 시작점 대비 퍼센트 변동률</small>
+                        </div>
+                        <button id="reset-chart" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-undo me-1"></i>기준점 리셋
+                        </button>
+                    </div>
+                    
+                    <!-- 시간대 선택 탭 -->
+                    <div class="mt-2">
+                        <ul class="nav nav-pills nav-sm" id="chart-time-tabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="1h-tab" data-bs-toggle="pill" data-bs-target="#1h" type="button" role="tab" data-period="1h">1시간</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="1d-tab" data-bs-toggle="pill" data-bs-target="#1d" type="button" role="tab" data-period="1d">1일</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="1w-tab" data-bs-toggle="pill" data-bs-target="#1w" type="button" role="tab" data-period="1w">1주</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="1m-tab" data-bs-toggle="pill" data-bs-target="#1m" type="button" role="tab" data-period="1m">1개월</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="3m-tab" data-bs-toggle="pill" data-bs-target="#3m" type="button" role="tab" data-period="3m">3개월</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="1y-tab" data-bs-toggle="pill" data-bs-target="#1y" type="button" role="tab" data-period="1y">1년</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="all-tab" data-bs-toggle="pill" data-bs-target="#all" type="button" role="tab" data-period="all">전체</button>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="chart-container">
@@ -204,46 +239,84 @@
         document.getElementById('start-monitoring').addEventListener('click', startMonitoring);
         document.getElementById('stop-monitoring').addEventListener('click', stopMonitoring);
         document.getElementById('refresh-data').addEventListener('click', refreshData);
+        document.getElementById('reset-chart').addEventListener('click', resetChartBaseline);
+        
+        // 시간대 탭 이벤트 리스너 추가
+        document.querySelectorAll('#chart-time-tabs .nav-link').forEach(tab => {
+            tab.addEventListener('click', function(e) {
+                e.preventDefault();
+                const period = this.getAttribute('data-period');
+                switchTimePeriod(period);
+            });
+        });
     });
     
     // 가격 차트 초기화
     function initializePriceChart() {
-        const ctx = document.getElementById('price-chart').getContext('2d');
+        const canvas = document.getElementById('price-chart');
+        if (!canvas) {
+            console.error('차트 캔버스를 찾을 수 없습니다');
+            return;
+        }
         
-        priceChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: []
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        ticks: {
-                            callback: function(value) {
-                                return '$' + value.toLocaleString();
+        try {
+            const ctx = canvas.getContext('2d');
+            
+            priceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toFixed(2) + '%';
+                                }
+                            },
+                            grid: {
+                                color: function(context) {
+                                    if (context.tick.value === 0) {
+                                        return '#000000'; // 0% 선을 진하게
+                                    }
+                                    return '#e0e0e0';
+                                }
                             }
                         }
-                    }
-                },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return context.dataset.label + ': $' + context.parsed.y.toLocaleString();
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const dataset = context.dataset;
+                                    const percentChange = context.parsed.y;
+                                    const basePrice = dataset.basePrice || 0;
+                                    const currentPrice = basePrice * (1 + percentChange / 100);
+                                    return `${dataset.label.split(' ')[0]}: ${percentChange.toFixed(2)}% (${formatPrice(currentPrice)})`;
+                                }
                             }
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
                         }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
                     }
-                },
-                interaction: {
-                    intersect: false,
-                    mode: 'index'
                 }
-            }
-        });
+            });
+            
+            console.log('가격 차트 초기화 완료');
+        } catch (error) {
+            console.error('차트 초기화 오류:', error);
+        }
     }
     
     // 초기 데이터 로드
@@ -251,7 +324,9 @@
         fetch('/api/prices?coins={{ coins|join(",") }}')
             .then(response => response.json())
             .then(data => {
+                console.log('초기 가격 데이터:', data);
                 updatePriceCards(data);
+                updatePriceChart(data); // 초기 차트 데이터 추가
             })
             .catch(error => {
                 console.error('가격 데이터 로드 오류:', error);
@@ -266,16 +341,36 @@
             .catch(error => {
                 console.error('거시경제 데이터 로드 오류:', error);
             });
+        
+        // 초기 샘플 신호 표시 (실제 데이터가 없을 때)
+        setTimeout(() => {
+            const signalsList = document.getElementById('signals-list');
+            if (signalsList && signalsList.textContent.includes('기다리는 중')) {
+                const sampleSignals = [
+                    {
+                        coin: 'BTC',
+                        signal: 'BUY',
+                        rsi: 28.5,
+                        trend: 'UP',
+                        strength: 3.2,
+                        timestamp: new Date().toLocaleTimeString('ko-KR')
+                    }
+                ];
+                updateSignalsList(sampleSignals);
+            }
+        }, 2000);
     }
     
-    // 실시간 데이터 수신
-    socket.on('data_update', function(data) {
-        updatePriceCards(data.prices);
-        updateTechnicalIndicators(data.market_analysis);
-        updateMacroIndicators(data.macro_data);
-        updatePriceChart(data.prices);
-        updateLastUpdateTime(data.timestamp);
-    });
+    // 실시간 데이터 수신 (Socket이 있을 때만)
+    if (socket) {
+        socket.on('data_update', function(data) {
+            updatePriceCards(data.prices);
+            updateTechnicalIndicators(data.market_analysis);
+            updateMacroIndicators(data.macro_data);
+            updatePriceChart(data.prices);
+            updateLastUpdateTime(data.timestamp);
+        });
+    }
     
     // 가격 카드 업데이트
     function updatePriceCards(prices) {
@@ -297,6 +392,8 @@
     
     // 기술적 지표 업데이트
     function updateTechnicalIndicators(analysis) {
+        const signals = [];
+        
         for (const [coin, data] of Object.entries(analysis)) {
             if (data) {
                 const rsiElement = document.getElementById(`rsi-${coin}`);
@@ -309,72 +406,362 @@
                     signalElement.textContent = data.signal || 'HOLD';
                     signalElement.className = 'badge ' + getSignalBadgeClass(data.signal);
                 }
+                
+                // 신호 수집 (HOLD가 아닌 경우만)
+                if (data.signal && data.signal !== 'HOLD') {
+                    signals.push({
+                        coin: coin.toUpperCase(),
+                        signal: data.signal,
+                        rsi: data.rsi,
+                        trend: data.trend,
+                        strength: data.strength,
+                        timestamp: new Date().toLocaleTimeString('ko-KR')
+                    });
+                }
             }
+        }
+        
+        // 신호 리스트 업데이트
+        updateSignalsList(signals);
+    }
+    
+    // 신호 리스트 업데이트
+    function updateSignalsList(signals) {
+        const signalsList = document.getElementById('signals-list');
+        if (!signalsList) return;
+        
+        if (signals.length === 0) {
+            signalsList.innerHTML = `
+                <div class="text-muted text-center">
+                    <i class="fas fa-clock me-2"></i>실시간 신호를 기다리는 중...
+                </div>
+            `;
+            return;
+        }
+        
+        const signalsHtml = signals.map(signal => {
+            const signalClass = signal.signal === 'BUY' ? 'success' : 'danger';
+            const icon = signal.signal === 'BUY' ? 'arrow-up' : 'arrow-down';
+            const strengthLevel = signal.strength > 5 ? '강함' : signal.strength > 2 ? '보통' : '약함';
+            
+            return `
+                <div class="alert alert-${signalClass} alert-sm mb-2 py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${signal.coin}</strong>
+                            <span class="badge bg-${signalClass} ms-2">
+                                <i class="fas fa-${icon} me-1"></i>${signal.signal}
+                            </span>
+                        </div>
+                        <small class="text-muted">${signal.timestamp}</small>
+                    </div>
+                    <div class="mt-1">
+                        <small>
+                            RSI: ${signal.rsi ? signal.rsi.toFixed(1) : '-'} | 
+                            추세: ${signal.trend || '-'} | 
+                            강도: ${strengthLevel}
+                        </small>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        signalsList.innerHTML = signalsHtml;
+    }
+    
+    // 알림을 신호 리스트에 추가
+    function addAlertToSignalsList(alert) {
+        const signalsList = document.getElementById('signals-list');
+        if (!signalsList) return;
+        
+        // 기존의 "기다리는 중" 메시지 제거
+        const waitingMessage = signalsList.querySelector('.text-muted');
+        if (waitingMessage && waitingMessage.textContent.includes('기다리는 중')) {
+            waitingMessage.remove();
+        }
+        
+        const alertClass = alert.severity === 'high' ? 'warning' : 'info';
+        const icon = alert.type === 'price_alert' ? 'dollar-sign' : 'exclamation-triangle';
+        
+        const alertHtml = `
+            <div class="alert alert-${alertClass} alert-sm mb-2 py-2" style="animation: fadeIn 0.5s;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-${icon} me-2"></i>
+                        <strong>알림</strong>
+                    </div>
+                    <small class="text-muted">${alert.timestamp ? new Date(alert.timestamp).toLocaleTimeString('ko-KR') : new Date().toLocaleTimeString('ko-KR')}</small>
+                </div>
+                <div class="mt-1">
+                    <small>${alert.message}</small>
+                </div>
+            </div>
+        `;
+        
+        // 새 알림을 맨 위에 추가
+        signalsList.insertAdjacentHTML('afterbegin', alertHtml);
+        
+        // 최대 5개 알림만 유지
+        const alerts = signalsList.querySelectorAll('.alert');
+        if (alerts.length > 5) {
+            alerts[alerts.length - 1].remove();
         }
     }
     
     // 거시경제 지표 업데이트
     function updateMacroIndicators(macroData) {
         if (macroData) {
+            // 안전한 값 추출 함수
+            function safeExtractNumber(value, defaultValue = 'N/A') {
+                if (value === 'N/A' || value === null || value === undefined) {
+                    return defaultValue;
+                }
+                if (typeof value === 'number') {
+                    return value;
+                }
+                if (typeof value === 'object' && value.value !== undefined) {
+                    return value.value;
+                }
+                if (typeof value === 'object' && value.price !== undefined) {
+                    return value.price;
+                }
+                // 문자열에서 숫자 추출 시도
+                const parsed = parseFloat(value);
+                return isNaN(parsed) ? defaultValue : parsed;
+            }
+            
             const fedRate = document.getElementById('fed-rate');
-            if (fedRate && macroData.fed_rate !== undefined) {
-                fedRate.textContent = macroData.fed_rate !== 'N/A' ? macroData.fed_rate + '%' : 'N/A';
+            if (fedRate) {
+                const value = safeExtractNumber(macroData.fed_rate);
+                fedRate.textContent = value !== 'N/A' ? value + '%' : 'N/A';
             }
             
             const unemployment = document.getElementById('unemployment');
-            if (unemployment && macroData.unemployment !== undefined) {
-                unemployment.textContent = macroData.unemployment !== 'N/A' ? macroData.unemployment + '%' : 'N/A';
+            if (unemployment) {
+                const value = safeExtractNumber(macroData.unemployment);
+                unemployment.textContent = value !== 'N/A' ? value + '%' : 'N/A';
             }
             
             const vix = document.getElementById('vix');
-            if (vix && macroData.vix !== undefined) {
-                vix.textContent = macroData.vix !== 'N/A' ? macroData.vix.toFixed(1) : 'N/A';
+            if (vix) {
+                const value = safeExtractNumber(macroData.vix);
+                vix.textContent = value !== 'N/A' ? value.toFixed(1) : 'N/A';
             }
             
             const sp500 = document.getElementById('sp500');
-            if (sp500 && macroData.sp500 !== undefined) {
-                sp500.textContent = macroData.sp500 !== 'N/A' ? macroData.sp500.toFixed(0) : 'N/A';
+            if (sp500) {
+                const value = safeExtractNumber(macroData.sp500);
+                sp500.textContent = value !== 'N/A' ? value.toFixed(0) : 'N/A';
             }
         }
     }
     
-    // 가격 차트 업데이트
+    // 차트 데이터 저장소
+    let chartDataStore = {
+        '1h': { labels: [], datasets: [] },
+        '1d': { labels: [], datasets: [] },
+        '1w': { labels: [], datasets: [] },
+        '1m': { labels: [], datasets: [] },
+        '3m': { labels: [], datasets: [] },
+        '1y': { labels: [], datasets: [] },
+        'all': { labels: [], datasets: [] }
+    };
+    
+    // 기준 가격 저장 (시간대별)
+    let basePrices = {};
+    let currentTimePeriod = '1h';
+    
+    // 데이터 보관 설정 (각 시간대별 최대 데이터 포인트)
+    const maxDataPoints = {
+        '1h': 60,    // 1시간: 60개 (1분마다)
+        '1d': 144,   // 1일: 144개 (10분마다)
+        '1w': 168,   // 1주: 168개 (1시간마다)
+        '1m': 180,   // 1개월: 180개 (4시간마다)
+        '3m': 180,   // 3개월: 180개 (12시간마다)
+        '1y': 365,   // 1년: 365개 (1일마다)
+        'all': 1000  // 전체: 1000개
+    };
+    
+    // 가격 차트 업데이트 (정규화된 퍼센트 차트)
     function updatePriceChart(prices) {
-        const now = new Date().toLocaleTimeString('ko-KR');
+        if (!priceChart) {
+            console.warn('가격 차트가 초기화되지 않았습니다');
+            return;
+        }
         
-        // 최대 20개 데이터 포인트 유지
-        if (priceChart.data.labels.length >= 20) {
-            priceChart.data.labels.shift();
-            priceChart.data.datasets.forEach(dataset => {
-                dataset.data.shift();
+        if (!prices || Object.keys(prices).length === 0) {
+            console.warn('가격 데이터가 없습니다');
+            return;
+        }
+        
+        try {
+            const now = new Date();
+            const timeLabel = now.toLocaleTimeString('ko-KR');
+            
+            // 모든 시간대에 데이터 추가
+            Object.keys(chartDataStore).forEach(period => {
+                addDataToTimePeriod(period, timeLabel, prices, now);
+            });
+            
+            // 현재 선택된 시간대 차트 업데이트
+            updateChartDisplay(currentTimePeriod);
+            
+            console.log('차트 업데이트 완료');
+        } catch (error) {
+            console.error('차트 업데이트 오류:', error);
+        }
+    }
+    
+    // 특정 시간대에 데이터 추가
+    function addDataToTimePeriod(period, timeLabel, prices, timestamp) {
+        const store = chartDataStore[period];
+        const maxPoints = maxDataPoints[period];
+        
+        // 샘플링 간격 결정 (실제 구현에서는 더 정교하게)
+        const sampleInterval = getSampleInterval(period);
+        if (!shouldSample(period, timestamp)) {
+            return;
+        }
+        
+        // 최대 데이터 포인트 유지
+        if (store.labels.length >= maxPoints) {
+            store.labels.shift();
+            store.datasets.forEach(dataset => {
+                if (dataset.data.length > 0) {
+                    dataset.data.shift();
+                }
             });
         }
         
-        priceChart.data.labels.push(now);
+        store.labels.push(timeLabel);
         
         // 각 코인별 데이터 업데이트
-        const coins = {{ coins|tojsonfilter }};
+        const coins = {{ coins|tojson }};
         const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'];
         
         coins.forEach((coin, index) => {
-            if (prices[coin]) {
+            if (prices[coin] && prices[coin].price && !isNaN(prices[coin].price)) {
+                const currentPrice = prices[coin].price;
+                
+                // 기준 가격 설정 (시간대별)
+                const basePriceKey = `${coin}_${period}`;
+                if (!basePrices[basePriceKey]) {
+                    basePrices[basePriceKey] = currentPrice;
+                }
+                
+                // 퍼센트 변동률 계산
+                const percentChange = ((currentPrice - basePrices[basePriceKey]) / basePrices[basePriceKey]) * 100;
+                
                 // 데이터셋이 없으면 생성
-                if (!priceChart.data.datasets[index]) {
-                    priceChart.data.datasets[index] = {
-                        label: coin.toUpperCase(),
+                if (!store.datasets[index]) {
+                    store.datasets[index] = {
+                        label: `${coin.toUpperCase()} (${formatPrice(currentPrice)})`,
                         data: [],
                         borderColor: colors[index % colors.length],
                         backgroundColor: colors[index % colors.length] + '20',
                         fill: false,
-                        tension: 0.1
+                        tension: 0.1,
+                        pointRadius: getPointRadius(period),
+                        pointHoverRadius: getPointRadius(period) + 2,
+                        basePrice: basePrices[basePriceKey]
                     };
+                } else {
+                    // 라벨 업데이트 (현재 가격 포함)
+                    store.datasets[index].label = `${coin.toUpperCase()} (${formatPrice(currentPrice)})`;
                 }
                 
-                priceChart.data.datasets[index].data.push(prices[coin].price);
+                // 길이 맞추기 (새로운 데이터셋인 경우)
+                while (store.datasets[index].data.length < store.labels.length - 1) {
+                    store.datasets[index].data.push(0);
+                }
+                
+                store.datasets[index].data.push(percentChange);
             }
         });
+    }
+    
+    // 차트 표시 업데이트
+    function updateChartDisplay(period) {
+        const store = chartDataStore[period];
+        
+        // 차트 데이터 업데이트
+        priceChart.data.labels = [...store.labels];
+        priceChart.data.datasets = store.datasets.map(dataset => ({
+            ...dataset,
+            data: [...dataset.data]
+        }));
         
         priceChart.update('none');
+    }
+    
+    // 샘플링 간격 결정
+    function getSampleInterval(period) {
+        const intervals = {
+            '1h': 60000,      // 1분
+            '1d': 600000,     // 10분
+            '1w': 3600000,    // 1시간
+            '1m': 14400000,   // 4시간
+            '3m': 43200000,   // 12시간
+            '1y': 86400000,   // 1일
+            'all': 86400000   // 1일
+        };
+        return intervals[period] || 60000;
+    }
+    
+    // 샘플링 여부 결정 (간단한 구현)
+    function shouldSample(period, timestamp) {
+        // 실제로는 더 정교한 샘플링 로직이 필요
+        // 지금은 모든 업데이트를 허용
+        return true;
+    }
+    
+    // 포인트 반지름 설정
+    function getPointRadius(period) {
+        const radius = {
+            '1h': 3,
+            '1d': 2,
+            '1w': 1,
+            '1m': 1,
+            '3m': 1,
+            '1y': 0,
+            'all': 0
+        };
+        return radius[period] || 1;
+    }
+    
+    // 차트 기준점 리셋
+    function resetChartBaseline() {
+        // 기준 가격 초기화
+        basePrices = {};
+        
+        // 모든 시간대 데이터 초기화
+        Object.keys(chartDataStore).forEach(period => {
+            chartDataStore[period] = { labels: [], datasets: [] };
+        });
+        
+        // 차트 데이터 초기화
+        if (priceChart) {
+            priceChart.data.labels = [];
+            priceChart.data.datasets = [];
+            priceChart.update();
+            console.log('차트 기준점이 리셋되었습니다');
+        }
+        
+        showAlert('차트 기준점이 리셋되었습니다. 새로운 기준점부터 변동률이 계산됩니다.', 'info');
+    }
+    
+    // 시간대 변경 이벤트 핸들러
+    function switchTimePeriod(period) {
+        currentTimePeriod = period;
+        updateChartDisplay(period);
+        
+        // 탭 활성화 상태 업데이트
+        document.querySelectorAll('#chart-time-tabs .nav-link').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        document.getElementById(period + '-tab').classList.add('active');
+        
+        console.log(`차트 시간대 변경: ${period}`);
     }
     
     // 신호 배지 클래스
@@ -388,18 +775,26 @@
     
     // 모니터링 시작
     function startMonitoring() {
-        socket.emit('start_monitoring');
-        isMonitoring = true;
-        updateMonitoringButtons();
-        showAlert('실시간 모니터링을 시작했습니다.', 'success');
+        if (socket) {
+            socket.emit('start_monitoring');
+            isMonitoring = true;
+            updateMonitoringButtons();
+            showAlert('실시간 모니터링을 시작했습니다.', 'success');
+        } else {
+            showAlert('실시간 모니터링을 사용할 수 없습니다. (Socket.IO 미지원)', 'warning');
+        }
     }
     
     // 모니터링 중지
     function stopMonitoring() {
-        socket.emit('stop_monitoring');
-        isMonitoring = false;
-        updateMonitoringButtons();
-        showAlert('실시간 모니터링을 중지했습니다.', 'info');
+        if (socket) {
+            socket.emit('stop_monitoring');
+            isMonitoring = false;
+            updateMonitoringButtons();
+            showAlert('실시간 모니터링을 중지했습니다.', 'info');
+        } else {
+            showAlert('실시간 모니터링을 사용할 수 없습니다. (Socket.IO 미지원)', 'warning');
+        }
     }
     
     // 데이터 새로고침
@@ -492,11 +887,13 @@
         `;
     }
     
-    // 모니터링 상태 수신
-    socket.on('monitoring_status', function(data) {
-        isMonitoring = data.status === 'started';
-        updateMonitoringButtons();
-    });
+    // 모니터링 상태 수신 (Socket이 있을 때만)
+    if (socket) {
+        socket.on('monitoring_status', function(data) {
+            isMonitoring = data.status === 'started';
+            updateMonitoringButtons();
+        });
+    }
     
     // 초기 버튼 상태 설정
     updateMonitoringButtons();

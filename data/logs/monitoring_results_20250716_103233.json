@@ -1,0 +1,42 @@
+{
+  "bitcoin": {
+    "coin_id": "bitcoin",
+    "price_data": {
+      "price": 117757.03771059394,
+      "market_cap": 2342536747438,
+      "volume_24h": 59178782323.683365,
+      "price_change_24h": -0.11,
+      "timestamp": "2025-07-16T10:32:31.484843",
+      "source": "CoinPaprika"
+    },
+    "technical_indicators": {},
+    "trading_signal": {
+      "signal": "HOLD",
+      "confidence": 0.5,
+      "indicators_used": [],
+      "timestamp": "2025-07-16T10:32:31.487157",
+      "reason": "명확한 신호 없음"
+    },
+    "analysis_timestamp": "2025-07-16T10:32:31.487165"
+  },
+  "ethereum": {
+    "coin_id": "ethereum",
+    "price_data": {
+      "price": 3141.43,
+      "market_cap": 379295675671.1101,
+      "volume_24h": 44095857325.35492,
+      "price_change_24h": 5.395182037052202,
+      "timestamp": "2025-07-16T10:32:32.592230",
+      "source": "CoinGecko"
+    },
+    "technical_indicators": {},
+    "trading_signal": {
+      "signal": "HOLD",
+      "confidence": 0.5,
+      "indicators_used": [],
+      "timestamp": "2025-07-16T10:32:32.592846",
+      "reason": "명확한 신호 없음"
+    },
+    "analysis_timestamp": "2025-07-16T10:32:32.592850"
+  }
+}

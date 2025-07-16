@@ -24,11 +24,19 @@ from coincompass.analysis.price_driver import PriceDriverAnalyzer
 from coincompass.analysis.technical import TechnicalAnalyzer
 from coincompass.analysis.macro import MacroeconomicAnalyzer
 from coincompass.config.api_keys import get_api_key_manager
+from coincompass.simulation.trading_engine import TradingEngine
+from coincompass.simulation.portfolio_manager import PortfolioManager
 from coincompass.utils.logger import get_logger
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'coincompass_secret_key_2025'
-socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Vercel 환경에서는 SocketIO 비활성화
+if os.environ.get('VERCEL_ENV'):
+    socketio = None
+    print("Vercel 환경에서 실행 중 - SocketIO 비활성화")
+else:
+    socketio = SocketIO(app, cors_allowed_origins="*")
 
 logger = get_logger(__name__)
 
@@ -39,6 +47,8 @@ price_analyzer = PriceDriverAnalyzer()
 technical_analyzer = TechnicalAnalyzer()
 macro_analyzer = MacroeconomicAnalyzer()
 api_key_manager = get_api_key_manager()
+trading_engine = TradingEngine()
+portfolio_manager = PortfolioManager()
 
 # 실시간 데이터 캐시
 live_data = {
@@ -99,13 +109,14 @@ class RealTimeMonitor:
                 
                 live_data['last_update'] = datetime.now()
                 
-                # WebSocket으로 데이터 전송
-                socketio.emit('data_update', {
-                    'prices': live_data['prices'],
-                    'market_analysis': live_data['market_analysis'],
-                    'macro_data': live_data['macro_data'],
-                    'timestamp': live_data['last_update'].isoformat()
-                })
+                # WebSocket으로 데이터 전송 (Vercel에서는 건너뛰기)
+                if socketio:
+                    socketio.emit('data_update', {
+                        'prices': live_data['prices'],
+                        'market_analysis': live_data['market_analysis'],
+                        'macro_data': live_data['macro_data'],
+                        'timestamp': live_data['last_update'].isoformat()
+                    })
                 
                 # 알림 체크
                 self._check_alerts()
@@ -164,11 +175,31 @@ class RealTimeMonitor:
         try:
             indicators = macro_analyzer.get_economic_indicators()
             if indicators:
+                # 안전한 값 추출 함수
+                def safe_extract_value(data, default='N/A'):
+                    """안전하게 숫자 값을 추출"""
+                    if isinstance(data, (int, float)):
+                        return data
+                    elif isinstance(data, dict) and 'value' in data:
+                        return data['value']
+                    elif isinstance(data, dict) and 'price' in data:
+                        return data['price']
+                    else:
+                        return default
+                
+                # 데이터 추출
+                fed_rate_data = indicators.get('fed_rate', 'N/A')
+                unemployment_data = indicators.get('unemployment', 'N/A')
+                
+                market_indices = indicators.get('market_indices', {})
+                vix_data = market_indices.get('VIX', 'N/A')
+                sp500_data = market_indices.get('SP500', 'N/A')
+                
                 live_data['macro_data'] = {
-                    'fed_rate': indicators.get('fed_rate', {}).get('value', 'N/A'),
-                    'unemployment': indicators.get('unemployment', {}).get('value', 'N/A'),
-                    'vix': indicators.get('market_indices', {}).get('VIX', {}).get('price', 'N/A'),
-                    'sp500': indicators.get('market_indices', {}).get('SP500', {}).get('price', 'N/A'),
+                    'fed_rate': safe_extract_value(fed_rate_data),
+                    'unemployment': safe_extract_value(unemployment_data),
+                    'vix': safe_extract_value(vix_data),
+                    'sp500': safe_extract_value(sp500_data),
                     'last_updated': datetime.now().isoformat()
                 }
         except Exception as e:
@@ -189,7 +220,8 @@ class RealTimeMonitor:
                         'timestamp': datetime.now().isoformat()
                     }
                     
-                    socketio.emit('alert', alert)
+                    if socketio:
+                        socketio.emit('alert', alert)
                     logger.info(f"알림 발송: {alert['message']}")
         except Exception as e:
             logger.error(f"알림 체크 오류: {str(e)}")
@@ -345,72 +377,216 @@ def api_fred_key():
         logger.error(f"FRED API 키 저장 오류: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-# WebSocket 이벤트 핸들러
-@socketio.on('connect')
-def handle_connect():
-    """클라이언트 연결"""
-    logger.info("클라이언트 연결됨")
+# 모의투자 관련 라우트
+@app.route('/simulation')
+def simulation():
+    """모의투자 페이지"""
+    user_id = 'default'  # 추후 사용자 인증 시스템 추가
     
-    # 현재 데이터 전송
-    emit('data_update', {
-        'prices': live_data['prices'],
-        'market_analysis': live_data['market_analysis'],
-        'macro_data': live_data['macro_data'],
-        'timestamp': live_data['last_update'].isoformat() if live_data['last_update'] else None
-    })
+    # 포트폴리오가 없으면 생성
+    portfolio = portfolio_manager.get_portfolio(user_id)
+    if not portfolio:
+        portfolio = portfolio_manager.create_portfolio(user_id)
+    
+    # 현재 가격으로 포트폴리오 업데이트
+    trading_engine.update_portfolio_prices(user_id)
+    
+    return render_template('simulation.html',
+                         coins=monitor_settings['coins'])
 
-@socketio.on('disconnect')
-def handle_disconnect():
-    """클라이언트 연결 해제"""
-    logger.info("클라이언트 연결 해제됨")
-
-@socketio.on('start_monitoring')
-def handle_start_monitoring():
-    """모니터링 시작 요청"""
+@app.route('/api/simulation/portfolio')
+def api_simulation_portfolio():
+    """포트폴리오 조회 API"""
+    user_id = 'default'
+    
     try:
-        monitor_settings['enabled'] = True
-        real_time_monitor.start()
-        emit('monitoring_status', {'status': 'started'})
-        logger.info("웹에서 모니터링 시작 요청")
-    except Exception as e:
-        logger.error(f"모니터링 시작 오류: {str(e)}")
-        emit('error', {'message': str(e)})
-
-@socketio.on('stop_monitoring')
-def handle_stop_monitoring():
-    """모니터링 중지 요청"""
-    try:
-        monitor_settings['enabled'] = False
-        real_time_monitor.stop()
-        emit('monitoring_status', {'status': 'stopped'})
-        logger.info("웹에서 모니터링 중지 요청")
-    except Exception as e:
-        logger.error(f"모니터링 중지 오류: {str(e)}")
-        emit('error', {'message': str(e)})
-
-@socketio.on('request_analysis')
-def handle_request_analysis(data):
-    """분석 요청"""
-    try:
-        coin = data.get('coin', 'bitcoin')
+        # 포트폴리오가 없으면 생성
+        portfolio = portfolio_manager.get_portfolio(user_id)
+        if not portfolio:
+            portfolio = portfolio_manager.create_portfolio(user_id)
         
-        # 간단한 분석 수행
-        price_data = api_provider.get_price_data(coin)
-        if price_data:
-            analysis_result = {
-                'coin': coin,
-                'price': price_data.price,
-                'change_24h': price_data.price_change_24h,
-                'analysis_time': datetime.now().isoformat()
-            }
-            
-            emit('analysis_result', analysis_result)
+        # 현재 가격으로 업데이트
+        trading_engine.update_portfolio_prices(user_id)
+        
+        # 거래 요약 정보
+        summary = trading_engine.get_trading_summary(user_id)
+        
+        return jsonify(summary)
+        
+    except Exception as e:
+        logger.error(f"포트폴리오 조회 오류: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/simulation/buy', methods=['POST'])
+def api_simulation_buy():
+    """매수 주문 API"""
+    user_id = 'default'
+    
+    try:
+        data = request.get_json()
+        coin_id = data.get('coin_id')
+        amount = float(data.get('amount', 0))  # 달러 금액
+        
+        if not coin_id or amount <= 0:
+            return jsonify({'error': '유효하지 않은 주문 정보입니다'}), 400
+        
+        # 현재 가격 조회
+        current_price = trading_engine.get_current_price(coin_id)
+        if not current_price:
+            return jsonify({'error': f'{coin_id} 가격 정보를 가져올 수 없습니다'}), 400
+        
+        # 수량 계산
+        quantity = amount / current_price
+        
+        # 매수 주문 실행
+        success, message, order = trading_engine.create_buy_order(user_id, coin_id, quantity)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': message,
+                'order': trading_engine.order_to_dict(order) if order else None
+            })
         else:
-            emit('error', {'message': f'{coin} 데이터를 가져올 수 없습니다'})
+            return jsonify({'success': False, 'error': message}), 400
             
     except Exception as e:
-        logger.error(f"분석 요청 오류: {str(e)}")
-        emit('error', {'message': str(e)})
+        logger.error(f"매수 주문 오류: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/simulation/sell', methods=['POST'])
+def api_simulation_sell():
+    """매도 주문 API"""
+    user_id = 'default'
+    
+    try:
+        data = request.get_json()
+        coin_id = data.get('coin_id')
+        percentage = float(data.get('percentage', 0))  # 매도할 비율 (0-100)
+        
+        if not coin_id or percentage <= 0 or percentage > 100:
+            return jsonify({'error': '유효하지 않은 주문 정보입니다'}), 400
+        
+        # 포트폴리오 확인
+        portfolio = portfolio_manager.get_portfolio(user_id)
+        if not portfolio or coin_id not in portfolio.positions:
+            return jsonify({'error': f'{coin_id}를 보유하고 있지 않습니다'}), 400
+        
+        # 매도 수량 계산
+        position = portfolio.positions[coin_id]
+        quantity = position.quantity * (percentage / 100)
+        
+        # 매도 주문 실행
+        success, message, order = trading_engine.create_sell_order(user_id, coin_id, quantity)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': message,
+                'order': trading_engine.order_to_dict(order) if order else None
+            })
+        else:
+            return jsonify({'success': False, 'error': message}), 400
+            
+    except Exception as e:
+        logger.error(f"매도 주문 오류: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/simulation/orders')
+def api_simulation_orders():
+    """주문 내역 조회 API"""
+    user_id = 'default'
+    
+    try:
+        orders = trading_engine.get_user_orders(user_id, limit=20)
+        orders_data = [trading_engine.order_to_dict(order) for order in orders]
+        
+        return jsonify({'orders': orders_data})
+        
+    except Exception as e:
+        logger.error(f"주문 내역 조회 오류: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/simulation/reset', methods=['POST'])
+def api_simulation_reset():
+    """포트폴리오 리셋 API"""
+    user_id = 'default'
+    
+    try:
+        portfolio_manager.reset_portfolio(user_id)
+        return jsonify({'success': True, 'message': '포트폴리오가 리셋되었습니다'})
+        
+    except Exception as e:
+        logger.error(f"포트폴리오 리셋 오류: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# WebSocket 이벤트 핸들러 (SocketIO가 있을 때만 등록)
+if socketio:
+    @socketio.on('connect')
+    def handle_connect():
+        """클라이언트 연결"""
+        logger.info("클라이언트 연결됨")
+        
+        # 현재 데이터 전송
+        emit('data_update', {
+            'prices': live_data['prices'],
+            'market_analysis': live_data['market_analysis'],
+            'macro_data': live_data['macro_data'],
+            'timestamp': live_data['last_update'].isoformat() if live_data['last_update'] else None
+        })
+
+    @socketio.on('disconnect')
+    def handle_disconnect():
+        """클라이언트 연결 해제"""
+        logger.info("클라이언트 연결 해제됨")
+
+    @socketio.on('start_monitoring')
+    def handle_start_monitoring():
+        """모니터링 시작 요청"""
+        try:
+            monitor_settings['enabled'] = True
+            real_time_monitor.start()
+            emit('monitoring_status', {'status': 'started'})
+            logger.info("웹에서 모니터링 시작 요청")
+        except Exception as e:
+            logger.error(f"모니터링 시작 오류: {str(e)}")
+            emit('error', {'message': str(e)})
+
+    @socketio.on('stop_monitoring')
+    def handle_stop_monitoring():
+        """모니터링 중지 요청"""
+        try:
+            monitor_settings['enabled'] = False
+            real_time_monitor.stop()
+            emit('monitoring_status', {'status': 'stopped'})
+            logger.info("웹에서 모니터링 중지 요청")
+        except Exception as e:
+            logger.error(f"모니터링 중지 오류: {str(e)}")
+            emit('error', {'message': str(e)})
+
+    @socketio.on('request_analysis')
+    def handle_request_analysis(data):
+        """분석 요청"""
+        try:
+            coin = data.get('coin', 'bitcoin')
+            
+            # 간단한 분석 수행
+            price_data = api_provider.get_price_data(coin)
+            if price_data:
+                analysis_result = {
+                    'coin': coin,
+                    'price': price_data.price,
+                    'change_24h': price_data.price_change_24h,
+                    'analysis_time': datetime.now().isoformat()
+                }
+                
+                emit('analysis_result', analysis_result)
+            else:
+                emit('error', {'message': f'{coin} 데이터를 가져올 수 없습니다'})
+                
+        except Exception as e:
+            logger.error(f"분석 요청 오류: {str(e)}")
+            emit('error', {'message': str(e)})
 
 if __name__ == '__main__':
     print("🌐 CoinCompass Web Dashboard 시작")
@@ -422,4 +598,7 @@ if __name__ == '__main__':
     print("="*50)
     
     # 개발 모드에서 실행
-    socketio.run(app, debug=True, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
+    if socketio:
+        socketio.run(app, debug=True, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
+    else:
+        app.run(debug=True, host='0.0.0.0', port=5001)

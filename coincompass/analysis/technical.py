@@ -71,28 +71,44 @@ class TechnicalAnalyzer:
             logger.warning("기술적 분석을 위한 데이터가 부족합니다")
             return TechnicalIndicators()
         
-        # 각 지표 계산
-        rsi = self.calculate_rsi(price_data)
-        sma_short = self.calculate_sma(price_data, 5)
-        sma_long = self.calculate_sma(price_data, 20)
-        macd_data = self.calculate_macd(price_data)
-        bollinger = self.calculate_bollinger_bands(price_data)
-        
-        # 최신 값들 추출
-        latest_idx = -1
-        
-        indicators = TechnicalIndicators(
-            rsi=rsi.iloc[latest_idx] if not pd.isna(rsi.iloc[latest_idx]) else None,
-            macd=macd_data['macd'].iloc[latest_idx] if not pd.isna(macd_data['macd'].iloc[latest_idx]) else None,
-            macd_signal=macd_data['signal'].iloc[latest_idx] if not pd.isna(macd_data['signal'].iloc[latest_idx]) else None,
-            sma_short=sma_short.iloc[latest_idx] if not pd.isna(sma_short.iloc[latest_idx]) else None,
-            sma_long=sma_long.iloc[latest_idx] if not pd.isna(sma_long.iloc[latest_idx]) else None,
-            bollinger_upper=bollinger['upper'].iloc[latest_idx] if not pd.isna(bollinger['upper'].iloc[latest_idx]) else None,
-            bollinger_lower=bollinger['lower'].iloc[latest_idx] if not pd.isna(bollinger['lower'].iloc[latest_idx]) else None,
-            bollinger_middle=bollinger['middle'].iloc[latest_idx] if not pd.isna(bollinger['middle'].iloc[latest_idx]) else None
-        )
-        
-        return indicators
+        try:
+            # 각 지표 계산
+            rsi = self.calculate_rsi(price_data)
+            sma_short = self.calculate_sma(price_data, 5)
+            sma_long = self.calculate_sma(price_data, 20)
+            macd_data = self.calculate_macd(price_data)
+            bollinger = self.calculate_bollinger_bands(price_data)
+            
+            # 안전한 값 추출 함수
+            def safe_get_latest(series: pd.Series) -> Optional[float]:
+                """시리즈에서 안전하게 최신 값을 추출"""
+                if series is None or len(series) == 0:
+                    return None
+                try:
+                    # NaN이 아닌 마지막 값 찾기
+                    valid_values = series.dropna()
+                    if len(valid_values) == 0:
+                        return None
+                    return valid_values.iloc[-1]
+                except (IndexError, KeyError):
+                    return None
+            
+            indicators = TechnicalIndicators(
+                rsi=safe_get_latest(rsi),
+                macd=safe_get_latest(macd_data['macd']),
+                macd_signal=safe_get_latest(macd_data['signal']),
+                sma_short=safe_get_latest(sma_short),
+                sma_long=safe_get_latest(sma_long),
+                bollinger_upper=safe_get_latest(bollinger['upper']),
+                bollinger_lower=safe_get_latest(bollinger['lower']),
+                bollinger_middle=safe_get_latest(bollinger['middle'])
+            )
+            
+            return indicators
+            
+        except Exception as e:
+            logger.error(f"기술적 분석 계산 오류: {str(e)}")
+            return TechnicalIndicators()
     
     def generate_trading_signal(self, price_data: pd.Series, indicators: TechnicalIndicators) -> TradingSignal:
         """매매 신호 생성"""
@@ -100,7 +116,15 @@ class TechnicalAnalyzer:
         reasons = []
         confidence_scores = []
         
-        current_price = price_data.iloc[-1]
+        # 안전하게 현재가 추출
+        try:
+            if len(price_data) == 0:
+                logger.warning("가격 데이터가 없어 신호 생성 불가")
+                return TradingSignal(signal='HOLD', confidence=0.0, indicators_used=[], reason='데이터 부족')
+            current_price = price_data.iloc[-1]
+        except (IndexError, KeyError):
+            logger.warning("현재가 추출 실패")
+            return TradingSignal(signal='HOLD', confidence=0.0, indicators_used=[], reason='가격 데이터 오류')
         
         # RSI 신호
         if indicators.rsi is not None:
@@ -115,22 +139,32 @@ class TechnicalAnalyzer:
         
         # MACD 신호
         if indicators.macd is not None and indicators.macd_signal is not None:
-            if indicators.macd > indicators.macd_signal:
-                if len(price_data) > 1:
-                    prev_macd = self.calculate_macd(price_data)['macd'].iloc[-2]
-                    prev_signal = self.calculate_macd(price_data)['signal'].iloc[-2]
-                    if prev_macd <= prev_signal:  # 골든크로스
-                        signals.append('BUY')
-                        reasons.append('MACD 골든크로스')
-                        confidence_scores.append(0.7)
-            else:
-                if len(price_data) > 1:
-                    prev_macd = self.calculate_macd(price_data)['macd'].iloc[-2]
-                    prev_signal = self.calculate_macd(price_data)['signal'].iloc[-2]
-                    if prev_macd >= prev_signal:  # 데드크로스
-                        signals.append('SELL')
-                        reasons.append('MACD 데드크로스')
-                        confidence_scores.append(0.7)
+            try:
+                if indicators.macd > indicators.macd_signal:
+                    if len(price_data) > 1:
+                        macd_data = self.calculate_macd(price_data)
+                        if (len(macd_data['macd']) >= 2 and len(macd_data['signal']) >= 2 and
+                            not pd.isna(macd_data['macd'].iloc[-2]) and not pd.isna(macd_data['signal'].iloc[-2])):
+                            prev_macd = macd_data['macd'].iloc[-2]
+                            prev_signal = macd_data['signal'].iloc[-2]
+                            if prev_macd <= prev_signal:  # 골든크로스
+                                signals.append('BUY')
+                                reasons.append('MACD 골든크로스')
+                                confidence_scores.append(0.7)
+                else:
+                    if len(price_data) > 1:
+                        macd_data = self.calculate_macd(price_data)
+                        if (len(macd_data['macd']) >= 2 and len(macd_data['signal']) >= 2 and
+                            not pd.isna(macd_data['macd'].iloc[-2]) and not pd.isna(macd_data['signal'].iloc[-2])):
+                            prev_macd = macd_data['macd'].iloc[-2]
+                            prev_signal = macd_data['signal'].iloc[-2]
+                            if prev_macd >= prev_signal:  # 데드크로스
+                                signals.append('SELL')
+                                reasons.append('MACD 데드크로스')
+                                confidence_scores.append(0.7)
+            except (IndexError, KeyError):
+                logger.warning("MACD 신호 계산 중 인덱스 오류")
+                pass
         
         # 이동평균 신호
         if indicators.sma_short is not None and indicators.sma_long is not None:

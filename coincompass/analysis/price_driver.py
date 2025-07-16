@@ -34,6 +34,7 @@ class PriceMovementAnalysis:
     primary_factors: List[PriceMovementFactor]
     summary: str
     recommendation: str
+    confidence: float  # 0.0 ~ 1.0 (분석 신뢰도)
 
 class PriceDriverAnalyzer:
     """가격 변동 요인 분석기"""
@@ -74,7 +75,8 @@ class PriceDriverAnalyzer:
                 movement_type="stable",
                 primary_factors=[],
                 summary="가격이 안정적으로 유지되고 있습니다.",
-                recommendation="현재 상황을 지켜보세요."
+                recommendation="현재 상황을 지켜보세요.",
+                confidence=0.8  # 안정적인 상황이므로 높은 신뢰도
             )
         
         # 주요 요인 분석
@@ -108,12 +110,19 @@ class PriceDriverAnalyzer:
         summary = self._generate_movement_summary(price_change, movement_type, factors)
         recommendation = self._generate_recommendation(movement_type, factors)
         
+        # 전체 신뢰도 계산 (주요 요인들의 가중 평균)
+        if factors:
+            confidence = sum(factor.confidence * abs(factor.impact_score) for factor in factors[:3]) / sum(abs(factor.impact_score) for factor in factors[:3])
+        else:
+            confidence = 0.5  # 기본값
+        
         return PriceMovementAnalysis(
             price_change_percent=price_change,
             movement_type=movement_type,
             primary_factors=factors[:3],  # 상위 3개 요인만
             summary=summary,
-            recommendation=recommendation
+            recommendation=recommendation,
+            confidence=min(1.0, max(0.0, confidence))  # 0.0 ~ 1.0 범위 보장
         )
     
     def _classify_movement(self, price_change: float) -> str:
@@ -136,6 +145,11 @@ class PriceDriverAnalyzer:
     def _analyze_technical_factors(self, price_data: pd.Series, price_change: float) -> Optional[PriceMovementFactor]:
         """기술적 요인 분석"""
         try:
+            # 데이터 유효성 검사
+            if price_data is None or len(price_data) < 5:
+                logger.warning("기술적 분석에 충분한 가격 데이터가 없습니다")
+                return None
+            
             indicators = self.technical_analyzer.analyze_price_data(price_data)
             signal = self.technical_analyzer.generate_trading_signal(price_data, indicators)
             

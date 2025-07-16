@@ -526,7 +526,7 @@
         
         // 코인 체크박스 초기화
         document.querySelectorAll('.coin-checkbox').forEach(cb => {
-            cb.checked = {{ settings.coins|tojsonfilter }}.includes(cb.value);
+            cb.checked = {{ settings.coins|tojson }}.includes(cb.value);
         });
         
         showAlert('모니터링 설정이 초기화되었습니다.', 'info');
