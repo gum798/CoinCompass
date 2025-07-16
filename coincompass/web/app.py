@@ -591,14 +591,20 @@ if socketio:
 if __name__ == '__main__':
     print("🌐 CoinCompass Web Dashboard 시작")
     print("="*50)
-    print("📱 웹 브라우저에서 http://localhost:5001 접속")
+    
+    # 포트 설정 (Railway, Heroku 등 클라우드 환경 지원)
+    port = int(os.environ.get('PORT', 5001))
+    host = os.environ.get('HOST', '0.0.0.0')
+    debug = os.environ.get('FLASK_ENV', 'development') == 'development'
+    
+    print(f"📱 웹 브라우저에서 http://{host}:{port} 접속")
     print("🔄 실시간 업데이트 지원")
-    print("⚙️ 설정: http://localhost:5001/settings")
+    print(f"⚙️ 설정: http://{host}:{port}/settings")
     print("🛑 종료: Ctrl+C")
     print("="*50)
     
     # 개발 모드에서 실행
     if socketio:
-        socketio.run(app, debug=True, host='0.0.0.0', port=5001, allow_unsafe_werkzeug=True)
+        socketio.run(app, debug=debug, host=host, port=port, allow_unsafe_werkzeug=True)
     else:
-        app.run(debug=True, host='0.0.0.0', port=5001)
+        app.run(debug=debug, host=host, port=port)
