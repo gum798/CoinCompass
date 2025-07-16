@@ -1,4 +1,4 @@
-# 핵심 웹 애플리케이션 패키지 (차트 라이브러리 제외)
+# 핵심 웹 애플리케이션 패키지
 Flask==2.3.3
 Flask-SocketIO==5.3.6
 python-socketio==5.8.0
@@ -16,5 +16,8 @@ numpy==1.24.4
 yfinance==0.2.18
 fredapi==0.5.0
 
-# 비동기 처리 (간소화)
+# 차트 (웹 전용, matplotlib 제외)
+plotly==5.15.0
+
+# 비동기 처리
 aiohttp==3.8.5

@@ -16,17 +16,61 @@ from flask import Flask, render_template, jsonify, request, redirect, url_for, f
 from flask_socketio import SocketIO, emit, disconnect
 import pandas as pd
 
-# CoinCompass 모듈 임포트
+# CoinCompass 모듈 임포트 (선택적 임포트로 안정성 확보)
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from coincompass.api.multi_provider import MultiAPIProvider
-from coincompass.analysis.market_analyzer import MarketAnalyzer
-from coincompass.analysis.price_driver import PriceDriverAnalyzer
-from coincompass.analysis.technical import TechnicalAnalyzer
-from coincompass.analysis.macro import MacroeconomicAnalyzer
-from coincompass.config.api_keys import get_api_key_manager
-from coincompass.simulation.trading_engine import TradingEngine
-from coincompass.simulation.portfolio_manager import PortfolioManager
-from coincompass.utils.logger import get_logger
+
+try:
+    from coincompass.api.multi_provider import MultiAPIProvider
+    from coincompass.analysis.market_analyzer import MarketAnalyzer
+    from coincompass.analysis.price_driver import PriceDriverAnalyzer
+    from coincompass.analysis.technical import TechnicalAnalyzer
+    from coincompass.analysis.macro import MacroeconomicAnalyzer
+    from coincompass.config.api_keys import get_api_key_manager
+    from coincompass.simulation.trading_engine import TradingEngine
+    from coincompass.simulation.portfolio_manager import PortfolioManager
+    from coincompass.utils.logger import get_logger
+    
+    MODULES_LOADED = True
+    print("✅ CoinCompass 모듈 로딩 성공")
+    
+except ImportError as e:
+    print(f"⚠️ 일부 CoinCompass 모듈 로딩 실패: {e}")
+    MODULES_LOADED = False
+    
+    # 최소한의 더미 클래스들
+    class DummyProvider:
+        def get_price_data(self, coin): return None
+    
+    class DummyAnalyzer:
+        def analyze(self, *args, **kwargs): return {}
+        def get_comprehensive_analysis(self, *args, **kwargs): return {}
+        def get_economic_indicators(self): return {}
+        def analyze_price_movement(self, *args, **kwargs): 
+            class DummyResult:
+                movement_type = "STABLE"
+                summary = "데이터 분석 기능이 제한됩니다"
+                recommendation = "전체 기능을 위해 필요한 패키지를 설치하세요"
+                confidence = 0.0
+            return DummyResult()
+    
+    class DummyManager:
+        def has_api_key(self, key): return False
+        def get_portfolio(self, user): return None
+        def create_portfolio(self, user): return None
+    
+    # 더미 객체들
+    api_provider = DummyProvider()
+    market_analyzer = DummyAnalyzer()
+    price_analyzer = DummyAnalyzer()
+    technical_analyzer = DummyAnalyzer()
+    macro_analyzer = DummyAnalyzer()
+    api_key_manager = DummyManager()
+    trading_engine = DummyManager()
+    portfolio_manager = DummyManager()
+    
+    def get_logger(name):
+        import logging
+        return logging.getLogger(name)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'coincompass_secret_key_2025'
@@ -40,15 +84,19 @@ else:
 
 logger = get_logger(__name__)
 
-# 글로벌 변수
-api_provider = MultiAPIProvider()
-market_analyzer = MarketAnalyzer()
-price_analyzer = PriceDriverAnalyzer()
-technical_analyzer = TechnicalAnalyzer()
-macro_analyzer = MacroeconomicAnalyzer()
-api_key_manager = get_api_key_manager()
-trading_engine = TradingEngine()
-portfolio_manager = PortfolioManager()
+# 글로벌 변수 (모듈 로딩 상태에 따라)
+if MODULES_LOADED:
+    api_provider = MultiAPIProvider()
+    market_analyzer = MarketAnalyzer()
+    price_analyzer = PriceDriverAnalyzer()
+    technical_analyzer = TechnicalAnalyzer()
+    macro_analyzer = MacroeconomicAnalyzer()
+    api_key_manager = get_api_key_manager()
+    trading_engine = TradingEngine()
+    portfolio_manager = PortfolioManager()
+else:
+    # 더미 객체들은 이미 위에서 생성됨
+    pass
 
 # 실시간 데이터 캐시
 live_data = {
