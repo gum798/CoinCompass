@@ -30,4 +30,4 @@ ENV FLASK_ENV=production
 RUN mkdir -p data/simulation
 
 # 애플리케이션 실행
-CMD ["python", "coincompass/web/app.py"]
+CMD ["python", "main.py"]
