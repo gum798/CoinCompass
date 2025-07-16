@@ -68,6 +68,9 @@ logs/
 # Railway
 railway.json
 
+# Docker (nixpacks 사용 시 제외)
+Dockerfile
+
 # Vercel (not needed for Railway)
 vercel.json
 api/

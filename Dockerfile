@@ -8,13 +8,18 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
+    build-essential \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
+
+# pip 업그레이드
+RUN pip install --upgrade pip setuptools wheel
 
 # Python 의존성 파일 복사
 COPY requirements.txt .
 
-# Python 패키지 설치
-RUN pip install --no-cache-dir -r requirements.txt
+# Python 패키지 설치 (더 안정적인 방법)
+RUN pip install --no-cache-dir --timeout 1000 -r requirements.txt
 
 # 애플리케이션 코드 복사
 COPY . .

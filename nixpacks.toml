@@ -1,11 +1,14 @@
 [phases.setup]
-nixPkgs = ["python39", "gcc", "pkg-config"]
+nixPkgs = ["python39", "gcc", "pkg-config", "stdenv.cc.cc.lib"]
 
 [phases.install]
-cmds = ["pip install -r requirements.txt"]
+cmds = [
+  "pip install --upgrade pip setuptools wheel",
+  "pip install --no-cache-dir -r requirements.txt"
+]
 
 [phases.build]
-cmds = ["echo 'Build phase completed'"]
+cmds = ["echo 'Build completed successfully'"]
 
 [start]
 cmd = "python main.py"
@@ -13,3 +16,4 @@ cmd = "python main.py"
 [variables]
 PYTHONPATH = "/app"
 FLASK_ENV = "production"
+PORT = "5001"
