@@ -226,12 +226,24 @@
     // 차트 변수
     let priceChart = null;
     let priceHistory = {};
+    let basePrices = {}; // 기준 가격 저장
+    let chartDataStore = {}; // 시간대별 차트 데이터 저장
+    let currentTimePeriod = '1h'; // 현재 선택된 시간대
     
     // 모니터링 상태
     let isMonitoring = false;
     
+    // 로컬스토리지 키
+    const STORAGE_KEYS = {
+        CHART_DATA: 'coincompass_chart_data',
+        BASE_PRICES: 'coincompass_base_prices',
+        LAST_UPDATE: 'coincompass_last_update',
+        CURRENT_PERIOD: 'coincompass_current_period'
+    };
+    
     // 페이지 로드 시 초기화
     document.addEventListener('DOMContentLoaded', function() {
+        loadStoredData(); // 저장된 데이터 복원
         initializePriceChart();
         loadInitialData();
         
@@ -601,18 +613,99 @@
             const now = new Date();
             const timeLabel = now.toLocaleTimeString('ko-KR');
             
-            // 모든 시간대에 데이터 추가
-            Object.keys(chartDataStore).forEach(period => {
-                addDataToTimePeriod(period, timeLabel, prices, now);
-            });
+            // 실시간 모드에서만 차트에 데이터 추가 (짧은 주기만)
+            if (currentTimePeriod === '1h' || currentTimePeriod === '1d') {
+                addRealTimeDataToChart(timeLabel, prices, now);
+            }
             
-            // 현재 선택된 시간대 차트 업데이트
-            updateChartDisplay(currentTimePeriod);
-            
-            console.log('차트 업데이트 완료');
+            console.log('실시간 차트 업데이트 완료');
         } catch (error) {
             console.error('차트 업데이트 오류:', error);
         }
+    }
+    
+    // 실시간 데이터를 현재 차트에 추가
+    function addRealTimeDataToChart(timeLabel, prices, timestamp) {
+        if (!chartDataStore[currentTimePeriod]) {
+            chartDataStore[currentTimePeriod] = { labels: [], datasets: [] };
+        }
+        
+        const store = chartDataStore[currentTimePeriod];
+        const maxPoints = maxDataPoints[currentTimePeriod];
+        
+        // 기준 가격 설정 (처음 데이터일 때)
+        for (const [coin, data] of Object.entries(prices)) {
+            if (data && !basePrices[coin]) {
+                basePrices[coin] = data.price;
+            }
+        }
+        
+        // 최대 데이터 포인트 유지
+        if (store.labels.length >= maxPoints) {
+            store.labels.shift();
+            store.datasets.forEach(dataset => {
+                if (dataset.data.length > 0) {
+                    dataset.data.shift();
+                }
+            });
+        }
+        
+        // 새 데이터 라벨 추가
+        store.labels.push(timeLabel);
+        
+        // 각 코인별 데이터 업데이트
+        const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'];
+        for (const [coin, data] of Object.entries(prices)) {
+            if (!data) continue;
+            
+            let dataset = store.datasets.find(ds => ds.label.includes(coin.toUpperCase()));
+            
+            if (!dataset) {
+                // 새 데이터셋 생성
+                const colorIndex = store.datasets.length % colors.length;
+                dataset = {
+                    label: `${coin.toUpperCase()} (${formatPrice(data.price)})`,
+                    data: [],
+                    borderColor: colors[colorIndex],
+                    backgroundColor: colors[colorIndex] + '20',
+                    fill: false,
+                    tension: 0.1,
+                    pointRadius: getPointRadius(currentTimePeriod),
+                    pointHoverRadius: getPointRadius(currentTimePeriod) + 2,
+                    basePrice: basePrices[coin] || data.price
+                };
+                store.datasets.push(dataset);
+            }
+            
+            // 퍼센트 변동률 계산
+            const basePrice = basePrices[coin] || data.price;
+            const percentChange = ((data.price - basePrice) / basePrice) * 100;
+            dataset.data.push(percentChange);
+            
+            // 라벨 업데이트 (현재 가격 포함)
+            dataset.label = `${coin.toUpperCase()} (${formatPrice(data.price)})`;
+        }
+        
+        // 현재 표시 중인 시간대라면 차트 업데이트
+        if (priceChart) {
+            priceChart.data.labels = store.labels;
+            priceChart.data.datasets = store.datasets;
+            priceChart.update('none'); // 애니메이션 없이 업데이트
+        }
+        
+        // 저장
+        saveChartData(currentTimePeriod, {
+            labels: [...store.labels],
+            datasets: store.datasets.map(ds => ({
+                label: ds.label,
+                data: [...ds.data],
+                borderColor: ds.borderColor,
+                backgroundColor: ds.backgroundColor,
+                basePrice: ds.basePrice
+            }))
+        });
+        
+        saveBasePrices();
     }
     
     // 특정 시간대에 데이터 추가
@@ -742,6 +835,9 @@
             chartDataStore[period] = { labels: [], datasets: [] };
         });
         
+        // localStorage도 초기화
+        clearStoredData();
+        
         // 차트 데이터 초기화
         if (priceChart) {
             priceChart.data.labels = [];
@@ -763,11 +859,35 @@
         });
         document.getElementById(period + '-tab').classList.add('active');
         
-        // 로딩 표시
-        showAlert(`${getPeriodDisplayName(period)} 데이터를 불러오는 중...`, 'info', 2000);
-        
-        // 실제 과거 데이터 로드
-        loadHistoricalData(period);
+        // 저장된 데이터가 있는지 확인
+        if (chartDataStore[period] && chartDataStore[period].labels && chartDataStore[period].datasets) {
+            console.log(`저장된 ${period} 데이터 사용`);
+            
+            // 저장된 데이터로 차트 업데이트
+            if (priceChart) {
+                priceChart.data.labels = chartDataStore[period].labels;
+                priceChart.data.datasets = chartDataStore[period].datasets.map((ds, index) => ({
+                    ...ds,
+                    fill: false,
+                    tension: 0.1,
+                    pointRadius: getPointRadius(period),
+                    pointHoverRadius: getPointRadius(period) + 2
+                }));
+                
+                // 차트 제목 업데이트
+                if (priceChart.options.plugins && priceChart.options.plugins.title) {
+                    priceChart.options.plugins.title.text = `${getPeriodDisplayName(period)} 변동률 차트 (저장된 데이터)`;
+                }
+                
+                priceChart.update();
+                showAlert(`${getPeriodDisplayName(period)} 저장된 데이터 복원`, 'info', 2000);
+            }
+        } else {
+            // 저장된 데이터가 없으면 새로 로드
+            console.log(`저장된 ${period} 데이터가 없음, 새로 로드`);
+            showAlert(`${getPeriodDisplayName(period)} 데이터를 불러오는 중...`, 'info', 2000);
+            loadHistoricalData(period);
+        }
         
         console.log(`차트 시간대 변경: ${period}`);
     }
@@ -871,6 +991,18 @@
         
         // 성공 메시지
         showAlert(`${getPeriodDisplayName(period)} 데이터 로드 완료 (${datasets.length}개 코인, ${labels.length}개 데이터 포인트)`, 'success', 3000);
+        
+        // 차트 데이터 저장
+        saveChartData(period, {
+            labels: labels,
+            datasets: datasets.map(ds => ({
+                label: ds.label,
+                data: ds.data,
+                borderColor: ds.borderColor,
+                backgroundColor: ds.backgroundColor,
+                basePrice: ds.basePrice
+            }))
+        });
     }
     
     // 신호 배지 클래스
@@ -1006,5 +1138,103 @@
     
     // 초기 버튼 상태 설정
     updateMonitoringButtons();
+    
+    // ==================== localStorage 관련 함수들 ====================
+    
+    // 저장된 데이터 로드
+    function loadStoredData() {
+        try {
+            // 차트 데이터 복원
+            const storedChartData = localStorage.getItem(STORAGE_KEYS.CHART_DATA);
+            if (storedChartData) {
+                chartDataStore = JSON.parse(storedChartData);
+                console.log('저장된 차트 데이터 복원:', Object.keys(chartDataStore));
+            }
+            
+            // 기준 가격 복원
+            const storedBasePrices = localStorage.getItem(STORAGE_KEYS.BASE_PRICES);
+            if (storedBasePrices) {
+                basePrices = JSON.parse(storedBasePrices);
+                console.log('저장된 기준 가격 복원:', basePrices);
+            }
+            
+            // 현재 시간대 복원
+            const storedPeriod = localStorage.getItem(STORAGE_KEYS.CURRENT_PERIOD);
+            if (storedPeriod) {
+                currentTimePeriod = storedPeriod;
+                // 탭 상태 복원
+                setTimeout(() => {
+                    document.querySelectorAll('#chart-time-tabs .nav-link').forEach(tab => {
+                        tab.classList.remove('active');
+                    });
+                    const targetTab = document.getElementById(currentTimePeriod + '-tab');
+                    if (targetTab) {
+                        targetTab.classList.add('active');
+                    }
+                }, 100);
+            }
+            
+            // 마지막 업데이트 시간 확인
+            const lastUpdate = localStorage.getItem(STORAGE_KEYS.LAST_UPDATE);
+            if (lastUpdate) {
+                const lastUpdateTime = new Date(lastUpdate);
+                const now = new Date();
+                const timeDiff = now - lastUpdateTime;
+                
+                // 1시간 이상 경과했으면 저장된 데이터 무효화
+                if (timeDiff > 60 * 60 * 1000) {
+                    console.log('저장된 데이터가 너무 오래됨, 초기화');
+                    clearStoredData();
+                } else {
+                    console.log(`저장된 데이터 유효 (${Math.round(timeDiff / 1000 / 60)}분 전)`);
+                }
+            }
+        } catch (error) {
+            console.error('저장된 데이터 로드 오류:', error);
+            clearStoredData();
+        }
+    }
+    
+    // 차트 데이터 저장
+    function saveChartData(period, data) {
+        try {
+            chartDataStore[period] = data;
+            localStorage.setItem(STORAGE_KEYS.CHART_DATA, JSON.stringify(chartDataStore));
+            localStorage.setItem(STORAGE_KEYS.CURRENT_PERIOD, currentTimePeriod);
+            localStorage.setItem(STORAGE_KEYS.LAST_UPDATE, new Date().toISOString());
+            console.log(`${period} 차트 데이터 저장됨`);
+        } catch (error) {
+            console.error('차트 데이터 저장 오류:', error);
+        }
+    }
+    
+    // 기준 가격 저장
+    function saveBasePrices() {
+        try {
+            localStorage.setItem(STORAGE_KEYS.BASE_PRICES, JSON.stringify(basePrices));
+            console.log('기준 가격 저장됨:', basePrices);
+        } catch (error) {
+            console.error('기준 가격 저장 오류:', error);
+        }
+    }
+    
+    // 저장된 데이터 초기화
+    function clearStoredData() {
+        try {
+            Object.values(STORAGE_KEYS).forEach(key => {
+                localStorage.removeItem(key);
+            });
+            chartDataStore = {};
+            basePrices = {};
+            console.log('저장된 데이터 초기화 완료');
+        } catch (error) {
+            console.error('데이터 초기화 오류:', error);
+        }
+    }
+    
+    // 페이지 나가기 전 데이터 저장
+    window.addEventListener('beforeunload', function() {
+        saveBasePrices();
+    });
 </script>
 {% endblock %}

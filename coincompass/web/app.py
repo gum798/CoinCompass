@@ -232,9 +232,17 @@ real_time_monitor = RealTimeMonitor()
 @app.route('/')
 def index():
     """메인 대시보드 페이지"""
+    # EmailJS 설정 (환경변수에서 읽기)
+    emailjs_config = {
+        'service_id': os.getenv('EMAILJS_SERVICE_ID', ''),
+        'template_id': os.getenv('EMAILJS_TEMPLATE_ID', 'template_feedback'),
+        'public_key': os.getenv('EMAILJS_PUBLIC_KEY', '')
+    }
+    
     return render_template('dashboard.html',
                          coins=monitor_settings['coins'],
-                         settings=monitor_settings)
+                         settings=monitor_settings,
+                         emailjs=emailjs_config)
 
 @app.route('/api/prices')
 def api_prices():
@@ -470,9 +478,17 @@ def settings():
     # FRED API 키 상태 확인
     fred_key_exists = api_key_manager.has_api_key('fred')
     
+    # EmailJS 설정
+    emailjs_config = {
+        'service_id': os.getenv('EMAILJS_SERVICE_ID', ''),
+        'template_id': os.getenv('EMAILJS_TEMPLATE_ID', 'template_feedback'),
+        'public_key': os.getenv('EMAILJS_PUBLIC_KEY', '')
+    }
+    
     return render_template('settings.html',
                          settings=monitor_settings,
-                         fred_key_exists=fred_key_exists)
+                         fred_key_exists=fred_key_exists,
+                         emailjs=emailjs_config)
 
 @app.route('/api/settings', methods=['GET', 'POST'])
 def api_settings():
@@ -544,8 +560,16 @@ def simulation():
     # 현재 가격으로 포트폴리오 업데이트
     trading_engine.update_portfolio_prices(user_id)
     
+    # EmailJS 설정
+    emailjs_config = {
+        'service_id': os.getenv('EMAILJS_SERVICE_ID', ''),
+        'template_id': os.getenv('EMAILJS_TEMPLATE_ID', 'template_feedback'),
+        'public_key': os.getenv('EMAILJS_PUBLIC_KEY', '')
+    }
+    
     return render_template('simulation.html',
-                         coins=monitor_settings['coins'])
+                         coins=monitor_settings['coins'],
+                         emailjs=emailjs_config)
 
 @app.route('/api/simulation/portfolio')
 def api_simulation_portfolio():
