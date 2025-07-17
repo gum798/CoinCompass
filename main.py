@@ -37,7 +37,7 @@ def create_minimal_app():
 
 try:
     # CoinCompass 웹 애플리케이션 임포트 및 실행
-    from coincompass.web.app import app, socketio
+    from coincompass.web.app import app, socketio, real_time_monitor, monitor_settings
     
     if __name__ == "__main__":
         # 포트 설정 (Railway, Heroku 등 클라우드 환경 지원)
@@ -49,6 +49,12 @@ try:
         print(f"📱 포트: {port}")
         print(f"🌐 호스트: {host}")
         print(f"🔧 디버그 모드: {debug}")
+        
+        # 모니터링이 활성화되어 있으면 자동 시작
+        if monitor_settings['enabled']:
+            real_time_monitor.start()
+            print("🟢 실시간 모니터링 자동 시작됨")
+            print(f"📊 모니터링 대상: {', '.join(monitor_settings['coins'])}")
         
         # 실행
         if socketio and hasattr(socketio, 'run'):

@@ -60,9 +60,9 @@ live_data = {
 
 # 모니터링 설정
 monitor_settings = {
-    'enabled': False,
+    'enabled': True,  # 기본값을 True로 변경
     'interval': 30,  # seconds
-    'coins': ['bitcoin', 'ethereum', 'ripple'],
+    'coins': ['bitcoin', 'ethereum', 'ripple', 'cardano', 'solana'],  # 더 많은 코인 추가
     'alerts': {
         'price_change_threshold': 5.0,
         'volume_change_threshold': 50.0
@@ -257,6 +257,159 @@ def api_prices():
             prices[coin] = None
     
     return jsonify(prices)
+
+@app.route('/api/historical-prices')
+def api_historical_prices():
+    """시간대별 과거 가격 데이터 API"""
+    coins = request.args.get('coins', 'bitcoin,ethereum,ripple').split(',')
+    period = request.args.get('period', '1d')  # 1h, 1d, 1w, 1m, 3m, 1y, all
+    
+    # 기간별 일수 매핑
+    period_days = {
+        '1h': 1/24,      # 1시간
+        '1d': 1,         # 1일
+        '1w': 7,         # 1주
+        '1m': 30,        # 1개월
+        '3m': 90,        # 3개월
+        '1y': 365,       # 1년
+        'all': 365 * 2   # 2년
+    }
+    
+    days = period_days.get(period, 1)
+    
+    historical_data = {}
+    for coin in coins:
+        try:
+            # yfinance를 사용해서 과거 데이터 가져오기
+            import yfinance as yf
+            
+            # 코인 심볼 매핑
+            coin_symbols = {
+                'bitcoin': 'BTC-USD',
+                'ethereum': 'ETH-USD',
+                'ripple': 'XRP-USD',
+                'cardano': 'ADA-USD',
+                'solana': 'SOL-USD'
+            }
+            
+            symbol = coin_symbols.get(coin.strip(), f"{coin.upper()}-USD")
+            ticker = yf.Ticker(symbol)
+            
+            # 기간별 인터벌 설정 (yfinance 제한 고려)
+            if period == '1h':
+                # 1시간: 최근 1일간 2분 간격으로 시도
+                try:
+                    hist = ticker.history(period="1d", interval="2m")
+                    if not hist.empty:
+                        # 최근 1시간 분량만 추출 (30개 데이터 포인트, 2분 * 30 = 60분)
+                        hist = hist.tail(30)
+                    else:
+                        # 실패시 5분 간격으로 시도
+                        hist = ticker.history(period="1d", interval="5m")
+                        if not hist.empty:
+                            hist = hist.tail(12)
+                except:
+                    # 마지막 대안: 1일 데이터에서 시간별로 샘플링
+                    hist = ticker.history(period="2d", interval="1h")
+                    if not hist.empty:
+                        hist = hist.tail(24)
+                        
+            elif period == '1d':
+                # 1일: 여러 방법 시도
+                try:
+                    # 방법 1: 5일간 30분 간격
+                    hist = ticker.history(period="5d", interval="30m")
+                    if not hist.empty:
+                        # 최근 1일 분량만 추출 (48개 데이터 포인트, 30분 * 48 = 24시간)
+                        hist = hist.tail(48)
+                    else:
+                        # 방법 2: 2일간 1시간 간격
+                        hist = ticker.history(period="2d", interval="1h")
+                        if not hist.empty:
+                            hist = hist.tail(24)
+                except:
+                    # 마지막 대안: 5일간 1시간 간격
+                    hist = ticker.history(period="5d", interval="1h")
+                    if not hist.empty:
+                        hist = hist.tail(24)
+            elif period == '1w':
+                # 1주: 1개월간 1시간 간격
+                hist = ticker.history(period="1mo", interval="1h")
+                if not hist.empty:
+                    # 최근 1주 분량만 추출 (168시간)
+                    hist = hist.tail(168)
+            elif period == '1m':
+                # 1개월: 3개월간 1일 간격
+                hist = ticker.history(period="3mo", interval="1d")
+                if not hist.empty:
+                    # 최근 1개월 분량만 추출 (30일)
+                    hist = hist.tail(30)
+            elif period == '3m':
+                # 3개월: 1년간 1일 간격
+                hist = ticker.history(period="1y", interval="1d")
+                if not hist.empty:
+                    # 최근 3개월 분량만 추출 (90일)
+                    hist = hist.tail(90)
+            elif period == '1y':
+                # 1년: 2년간 1주 간격
+                hist = ticker.history(period="2y", interval="1wk")
+                if not hist.empty:
+                    # 최근 1년 분량만 추출 (52주)
+                    hist = hist.tail(52)
+            else:  # 'all'
+                # 전체: 최대 5년간 1개월 간격
+                hist = ticker.history(period="5y", interval="1mo")
+            
+            if not hist.empty:
+                # 기준 가격 (첫 번째 가격)
+                base_price = hist['Close'].iloc[0]
+                
+                # 데이터 포인트 준비
+                timestamps = []
+                prices = []
+                percent_changes = []
+                
+                for idx, row in hist.iterrows():
+                    timestamps.append(idx.strftime('%Y-%m-%d %H:%M:%S'))
+                    prices.append(float(row['Close']))
+                    percent_change = ((row['Close'] - base_price) / base_price) * 100
+                    percent_changes.append(float(percent_change))
+                
+                historical_data[coin] = {
+                    'timestamps': timestamps,
+                    'prices': prices,
+                    'percent_changes': percent_changes,
+                    'base_price': float(base_price),
+                    'current_price': float(hist['Close'].iloc[-1]),
+                    'data_points': len(timestamps),
+                    'period_requested': period,
+                    'symbol_used': symbol
+                }
+                
+                logger.info(f"{coin} ({symbol}) {period} 데이터 성공: {len(timestamps)}개 포인트")
+            else:
+                logger.warning(f"{coin} ({symbol}) {period} 데이터 없음")
+                historical_data[coin] = {
+                    'error': 'No data available',
+                    'symbol': symbol,
+                    'period': period,
+                    'message': f'yfinance에서 {symbol}의 {period} 데이터를 가져올 수 없습니다'
+                }
+                
+        except Exception as e:
+            logger.error(f"{coin} 과거 데이터 조회 오류 (period={period}): {str(e)}")
+            # 오류 정보를 클라이언트에 전달
+            historical_data[coin] = {
+                'error': str(e),
+                'symbol': symbol if 'symbol' in locals() else 'unknown',
+                'period': period
+            }
+    
+    return jsonify({
+        'period': period,
+        'data': historical_data,
+        'timestamp': datetime.now().isoformat()
+    })
 
 @app.route('/api/analysis/<coin>')
 def api_analysis(coin):
@@ -602,6 +755,12 @@ if __name__ == '__main__':
     print(f"⚙️ 설정: http://{host}:{port}/settings")
     print("🛑 종료: Ctrl+C")
     print("="*50)
+    
+    # 모니터링이 활성화되어 있으면 자동 시작
+    if monitor_settings['enabled']:
+        real_time_monitor.start()
+        print("🟢 실시간 모니터링 자동 시작됨")
+        print(f"📊 모니터링 대상: {', '.join(monitor_settings['coins'])}")
     
     # 개발 모드에서 실행
     if socketio:
