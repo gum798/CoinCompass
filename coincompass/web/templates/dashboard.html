@@ -1248,18 +1248,18 @@
         if (apiCallMade) {
             statusIndicator.className = 'status-indicator bg-success';
             statusText.textContent = 'API 호출 완료 (최신 데이터)';
-            statusText.style.color = '#198754';
+            statusText.style.color = '#4caf50';
             
             // 5초 후 일반 상태로 변경
             setTimeout(() => {
                 statusIndicator.className = 'status-indicator bg-info';
                 statusText.textContent = 'API 대기 중 (기존 데이터 사용)';
-                statusText.style.color = '#0dcaf0';
+                statusText.style.color = '#26a69a';
             }, 5000);
         } else {
             statusIndicator.className = 'status-indicator bg-info';
             statusText.textContent = 'API 대기 중 (기존 데이터 사용)';
-            statusText.style.color = '#0dcaf0';
+            statusText.style.color = '#26a69a';
         }
     }
     

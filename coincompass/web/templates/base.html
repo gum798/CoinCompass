@@ -16,12 +16,17 @@
     
     <style>
         :root {
-            --primary-color: #2c5aa0;
+            --primary-color: #26a69a;
+            --primary-light: #4db6ac;
+            --primary-dark: #00695c;
+            --mint-gradient-start: #26a69a;
+            --mint-gradient-end: #4db6ac;
+            --mint-accent: #80cbc4;
             --secondary-color: #f8f9fa;
-            --success-color: #198754;
-            --danger-color: #dc3545;
-            --warning-color: #ffc107;
-            --info-color: #0dcaf0;
+            --success-color: #4caf50;
+            --danger-color: #f44336;
+            --warning-color: #ff9800;
+            --info-color: #26a69a;
             --dark-color: #212529;
         }
         
@@ -47,12 +52,12 @@
         }
         
         .price-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--mint-gradient-start) 0%, var(--mint-gradient-end) 100%);
             color: white;
         }
         
         .price-positive {
-            color: #198754 !important;
+            color: #4caf50 !important;
         }
         
         .price-negative {
@@ -117,7 +122,7 @@
         
         .sidebar {
             min-height: 100vh;
-            background: linear-gradient(180deg, #2c5aa0 0%, #1e3a6f 100%);
+            background: linear-gradient(180deg, var(--primary-color) 0%, var(--primary-dark) 100%);
         }
         
         .sidebar .nav-link {
