@@ -11,30 +11,33 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="card-title mb-0">
-                            <i class="fas fa-tachometer-alt me-2"></i>실시간 모니터링
+                            <i class="fas fa-tachometer-alt me-2"></i>실시간 모니터링 제어판
                         </h5>
+                        <p class="mb-0 text-muted">
+                            <small>암호화폐 가격과 변동률을 실시간으로 추적하여 투자 기회를 놓치지 마세요</small>
+                        </p>
                         <div>
-                            <button id="start-monitoring" class="btn btn-success me-2">
+                            <button id="start-monitoring" class="btn btn-success me-2 mobile-touch-btn"
                                 <i class="fas fa-play me-1"></i>시작
                             </button>
-                            <button id="stop-monitoring" class="btn btn-danger me-2">
+                            <button id="stop-monitoring" class="btn btn-danger me-2 mobile-touch-btn"
                                 <i class="fas fa-stop me-1"></i>중지
                             </button>
-                            <button id="refresh-data" class="btn btn-outline-primary">
+                            <button id="refresh-data" class="btn btn-outline-primary mobile-touch-btn"
                                 <i class="fas fa-sync-alt me-1"></i>새로고침
                             </button>
                         </div>
                     </div>
                     <div class="mt-3">
                         <small class="text-muted">
-                            모니터링 간격: <span id="monitor-interval">{{ settings.interval }}</span>초 | 
-                            API 호출 간격: <span id="api-interval">{{ settings.api_call_interval }}</span>초 | 
-                            추적 코인: <span id="monitor-coins">{{ settings.coins|join(', ') }}</span>
+                            <i class="fas fa-sync me-1"></i>업데이트 주기: <span id="monitor-interval">{{ settings.interval }}</span>초 | 
+                            <i class="fas fa-cloud me-1"></i>API 호출 간격: <span id="api-interval">{{ settings.api_call_interval }}</span>초 | 
+                            <i class="fas fa-coins me-1"></i>추적 중: <span id="monitor-coins">{{ settings.coins|join(', ') }}</span>
                         </small>
                         <br>
-                        <small class="text-muted">
-                            <span class="status-indicator" id="api-status"></span>
-                            <span id="api-status-text">API 상태 확인 중...</span>
+                        <small class="text-muted d-flex align-items-center">
+                            <span class="status-indicator me-1" id="api-status"></span>
+                            <span id="api-status-text">API 연결 상태 확인 중...</span>
                         </small>
                     </div>
                 </div>
@@ -52,17 +55,17 @@
                     <div class="metric-value" id="price-{{ coin }}">$0.00</div>
                     <div class="d-flex justify-content-between mt-3">
                         <div>
-                            <div class="metric-label">24시간 변동</div>
+                            <div class="metric-label"><i class="fas fa-chart-line me-1"></i>24시간 변동률</div>
                             <div id="change-{{ coin }}" class="fw-bold">0.00%</div>
                         </div>
                         <div>
-                            <div class="metric-label">거래량</div>
+                            <div class="metric-label"><i class="fas fa-volume-up me-1"></i>거래량</div>
                             <div id="volume-{{ coin }}" class="fw-bold">$0</div>
                         </div>
                     </div>
                     <div class="mt-2">
-                        <button class="btn btn-light btn-sm" onclick="showAnalysis('{{ coin }}')">
-                            <i class="fas fa-chart-bar me-1"></i>분석
+                        <button class="btn btn-light btn-sm mobile-touch-btn" onclick="showAnalysis('{{ coin }}')" title="상세 기술적 분석 보기"
+                            <i class="fas fa-chart-bar me-1"></i>상세 분석
                         </button>
                     </div>
                 </div>
@@ -79,40 +82,50 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h5 class="mb-0">
-                                <i class="fas fa-chart-line me-2"></i>실시간 변동률 차트
+                                <i class="fas fa-chart-line me-2"></i>실시간 변동률 추적 차트
                             </h5>
-                            <small class="text-muted">각 코인의 시작점 대비 퍼센트 변동률</small>
+                            <small class="text-muted">선택한 기간 동안 각 코인의 가격 변동률을 실시간으로 비교 분석합니다</small>
                         </div>
-                        <button id="reset-chart" class="btn btn-outline-secondary btn-sm">
+                        <button id="reset-chart" class="btn btn-outline-secondary btn-sm mobile-touch-btn" title="차트 기준점을 현재 시점으로 초기화"
                             <i class="fas fa-undo me-1"></i>기준점 리셋
                         </button>
                     </div>
                     
-                    <!-- 시간대 선택 탭 -->
+                    <!-- 개선된 시간대 선택 -->
                     <div class="mt-2">
-                        <ul class="nav nav-pills nav-sm" id="chart-time-tabs" role="tablist">
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link active" id="1h-tab" data-bs-toggle="pill" data-bs-target="#1h" type="button" role="tab" data-period="1h">1시간</button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="1d-tab" data-bs-toggle="pill" data-bs-target="#1d" type="button" role="tab" data-period="1d">1일</button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="1w-tab" data-bs-toggle="pill" data-bs-target="#1w" type="button" role="tab" data-period="1w">1주</button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="1m-tab" data-bs-toggle="pill" data-bs-target="#1m" type="button" role="tab" data-period="1m">1개월</button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="3m-tab" data-bs-toggle="pill" data-bs-target="#3m" type="button" role="tab" data-period="3m">3개월</button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="1y-tab" data-bs-toggle="pill" data-bs-target="#1y" type="button" role="tab" data-period="1y">1년</button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="all-tab" data-bs-toggle="pill" data-bs-target="#all" type="button" role="tab" data-period="all">전체</button>
-                            </li>
-                        </ul>
+                        <div class="chart-time-controls d-flex align-items-center flex-wrap gap-2 swipe-container">
+                            <div class="time-group-selector">
+                                <div class="btn-group btn-group-sm" role="group" aria-label="시간대 그룹 선택">
+                                    <input type="radio" class="btn-check" name="timeGroup" id="short-term" checked>
+                                    <label class="btn btn-outline-primary" for="short-term" title="실시간 및 일중 차트">
+                                        <i class="fas fa-clock me-1"></i>단기
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="timeGroup" id="medium-term">
+                                    <label class="btn btn-outline-primary" for="medium-term" title="주간 및 월간 차트">
+                                        <i class="fas fa-calendar-week me-1"></i>중기
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="timeGroup" id="long-term">
+                                    <label class="btn btn-outline-primary" for="long-term" title="장기 추세 분석">
+                                        <i class="fas fa-chart-line me-1"></i>장기
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="detailed-period-selector">
+                                <select class="form-select form-select-sm" id="detailed-period" style="min-width: 120px;">
+                                    <!-- 동적으로 업데이트됨 -->
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="time-info mt-2">
+                            <small class="text-muted d-flex align-items-center">
+                                <i class="fas fa-info-circle me-1"></i>
+                                <span id="period-description">실시간 가격 변동을 확인하세요</span>
+                            </small>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body">
@@ -261,14 +274,10 @@
         document.getElementById('refresh-data').addEventListener('click', refreshData);
         document.getElementById('reset-chart').addEventListener('click', resetChartBaseline);
         
-        // 시간대 탭 이벤트 리스너 추가
-        document.querySelectorAll('#chart-time-tabs .nav-link').forEach(tab => {
-            tab.addEventListener('click', function(e) {
-                e.preventDefault();
-                const period = this.getAttribute('data-period');
-                switchTimePeriod(period);
-            });
-        });
+        // 새로운 시간대 선택 시스템 초기화
+        initializeTimeControls();
+        
+        // 구 탭 시스템은 새로운 그룹화 시스템으로 대체됨
     });
     
     // 가격 차트 초기화
@@ -863,11 +872,20 @@
     function switchTimePeriod(period) {
         currentTimePeriod = period;
         
-        // 탭 활성화 상태 업데이트
-        document.querySelectorAll('#chart-time-tabs .nav-link').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        document.getElementById(period + '-tab').classList.add('active');
+        // 현재 시간대 업데이트 (새로운 시스템에서는 select 값으로 관리)
+        const periodSelect = document.getElementById('detailed-period');
+        if (periodSelect && periodSelect.value !== period) {
+            periodSelect.value = period;
+            
+            // 설명도 업데이트
+            const selectedOption = periodSelect.options[periodSelect.selectedIndex];
+            if (selectedOption) {
+                const description = selectedOption.getAttribute('data-description');
+                if (description) {
+                    document.getElementById('period-description').textContent = description;
+                }
+            }
+        }
         
         // 저장된 데이터가 있는지 확인
         if (chartDataStore[period] && chartDataStore[period].labels && chartDataStore[period].datasets) {
@@ -1104,6 +1122,79 @@
         priceChart.update();
         
         showAlert(`${getPeriodDisplayName(period)} 더미 데이터를 표시합니다 (네트워크 연결 후 새로고침하세요)`, 'info', 6000);
+    }
+    
+    // 새로운 시간대 제어 시스템
+    function initializeTimeControls() {
+        const timeGroups = {
+            'short-term': [
+                { value: '1h', label: '1시간', description: '실시간 가격 변동을 확인하세요' },
+                { value: '1d', label: '1일', description: '오늘 하루 동안의 가격 추세를 분석하세요' }
+            ],
+            'medium-term': [
+                { value: '1w', label: '1주', description: '주간 트렌드와 패턴을 파악하세요' },
+                { value: '1m', label: '1개월', description: '월간 성과와 변동성을 확인하세요' }
+            ],
+            'long-term': [
+                { value: '3m', label: '3개월', description: '계절적 트렌드와 중장기 추세를 분석하세요' },
+                { value: '1y', label: '1년', description: '연간 성과와 시장 사이클을 확인하세요' },
+                { value: 'all', label: '전체', description: '모든 기간의 역사적 데이터를 살펴보세요' }
+            ]
+        };
+        
+        // 초기 옵션 설정 (단기)
+        updateDetailedPeriodOptions('short-term', timeGroups);
+        
+        // 그룹 변경 이벤트
+        document.querySelectorAll('input[name="timeGroup"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.checked) {
+                    updateDetailedPeriodOptions(this.id, timeGroups);
+                }
+            });
+        });
+        
+        // 세부 기간 변경 이벤트
+        document.getElementById('detailed-period').addEventListener('change', function() {
+            const period = this.value;
+            const selectedOption = this.options[this.selectedIndex];
+            const description = selectedOption.getAttribute('data-description');
+            
+            // 설명 업데이트
+            document.getElementById('period-description').textContent = description;
+            
+            // 차트 업데이트
+            switchTimePeriod(period);
+        });
+    }
+    
+    function updateDetailedPeriodOptions(groupId, timeGroups) {
+        const select = document.getElementById('detailed-period');
+        const group = timeGroups[groupId];
+        
+        // 옵션 초기화
+        select.innerHTML = '';
+        
+        // 새 옵션 추가
+        group.forEach((option, index) => {
+            const optionElement = document.createElement('option');
+            optionElement.value = option.value;
+            optionElement.textContent = option.label;
+            optionElement.setAttribute('data-description', option.description);
+            
+            if (index === 0) {
+                optionElement.selected = true;
+                document.getElementById('period-description').textContent = option.description;
+                currentTimePeriod = option.value;
+            }
+            
+            select.appendChild(optionElement);
+        });
+        
+        // 첫 번째 옵션으로 차트 업데이트
+        if (group.length > 0) {
+            switchTimePeriod(group[0].value);
+        }
     }
     
     // 신호 배지 클래스
