@@ -327,7 +327,15 @@ def api_historical_prices():
     for coin in coins:
         try:
             # yfinance를 사용해서 과거 데이터 가져오기
-            import yfinance as yf
+            try:
+                import yfinance as yf
+            except ImportError:
+                logger.error("yfinance 모듈이 설치되지 않았습니다. pip install yfinance 를 실행하세요.")
+                historical_data[coin] = {
+                    'error': 'yfinance module not installed',
+                    'message': 'yfinance 모듈이 설치되지 않았습니다.'
+                }
+                continue
             
             # 코인 심볼 매핑
             coin_symbols = {
@@ -445,9 +453,10 @@ def api_historical_prices():
         except Exception as e:
             logger.error(f"{coin} 과거 데이터 조회 오류 (period={period}): {str(e)}")
             # 오류 정보를 클라이언트에 전달
+            symbol = coin_symbols.get(coin.strip(), f"{coin.upper()}-USD") if 'coin_symbols' in locals() else 'unknown'
             historical_data[coin] = {
                 'error': str(e),
-                'symbol': symbol if 'symbol' in locals() else 'unknown',
+                'symbol': symbol,
                 'period': period
             }
     

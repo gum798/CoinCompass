@@ -249,7 +249,9 @@
     
     // 페이지 로드 시 초기화
     document.addEventListener('DOMContentLoaded', function() {
+        // 초기화 순서 최적화
         loadStoredData(); // 저장된 데이터 복원
+        initializeChartDataStore(); // 차트 데이터 저장소 초기화
         initializePriceChart();
         loadInitialData();
         
@@ -578,20 +580,21 @@
         }
     }
     
-    // 차트 데이터 저장소
-    let chartDataStore = {
-        '1h': { labels: [], datasets: [] },
-        '1d': { labels: [], datasets: [] },
-        '1w': { labels: [], datasets: [] },
-        '1m': { labels: [], datasets: [] },
-        '3m': { labels: [], datasets: [] },
-        '1y': { labels: [], datasets: [] },
-        'all': { labels: [], datasets: [] }
-    };
-    
-    // 기준 가격 저장 (시간대별)
-    let basePrices = {};
-    let currentTimePeriod = '1h';
+    // 차트 데이터 저장소 초기화 함수
+    function initializeChartDataStore() {
+        if (!chartDataStore || Object.keys(chartDataStore).length === 0) {
+            chartDataStore = {
+                '1h': { labels: [], datasets: [] },
+                '1d': { labels: [], datasets: [] },
+                '1w': { labels: [], datasets: [] },
+                '1m': { labels: [], datasets: [] },
+                '3m': { labels: [], datasets: [] },
+                '1y': { labels: [], datasets: [] },
+                'all': { labels: [], datasets: [] }
+            };
+            console.log('차트 데이터 저장소 초기화 완료');
+        }
+    }
     
     // 데이터 보관 설정 (각 시간대별 최대 데이터 포인트)
     const maxDataPoints = {
@@ -919,17 +922,38 @@
         const coinsParam = coins.join(',');
         
         fetch(`/api/historical-prices?coins=${coinsParam}&period=${period}`)
-            .then(response => response.json())
+            .then(async response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 console.log(`${period} 기간 과거 데이터:`, data);
                 updateChartWithHistoricalData(period, data);
             })
             .catch(error => {
                 console.error(`${period} 과거 데이터 로드 오류:`, error);
-                showAlert(`${getPeriodDisplayName(period)} 데이터 로드에 실패했습니다`, 'danger');
                 
-                // 실패 시 기존 방식으로 폴백
-                updateChartDisplay(period);
+                // 상세한 오류 메시지
+                let errorMessage = `${getPeriodDisplayName(period)} 데이터 로드 실패`;
+                if (error.message.includes('HTTP')) {
+                    errorMessage += `: ${error.message}`;
+                } else if (error.name === 'TypeError') {
+                    errorMessage += ': 네트워크 연결을 확인하세요';
+                }
+                
+                showAlert(errorMessage, 'danger', 8000);
+                
+                // 저장된 데이터가 있다면 사용
+                if (chartDataStore[period] && chartDataStore[period].labels.length > 0) {
+                    console.log(`${period} 저장된 데이터로 폴백`);
+                    switchTimePeriod(period); // 저장된 데이터 로드
+                    showAlert(`${getPeriodDisplayName(period)} 저장된 데이터를 사용합니다`, 'warning', 5000);
+                } else {
+                    // 더미 데이터 생성
+                    generateFallbackChart(period);
+                }
             });
     }
     
@@ -1010,6 +1034,76 @@
                 basePrice: ds.basePrice
             }))
         });
+    }
+    
+    // 폴백 차트 생성 (API 실패 시)
+    function generateFallbackChart(period) {
+        if (!priceChart) return;
+        
+        console.log(`${period} 폴백 차트 생성`);
+        
+        const coins = {{ coins|tojson }};
+        const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'];
+        const datasets = [];
+        
+        // 시간대별 데이터 포인트 수
+        const pointCount = {
+            '1h': 12,   // 5분마다
+            '1d': 24,   // 1시간마다  
+            '1w': 7,    // 1일마다
+            '1m': 30,   // 1일마다
+            '3m': 12,   // 1주마다
+            '1y': 12,   // 1개월마다
+            'all': 24   // 2주마다
+        }[period] || 12;
+        
+        // 시간 라벨 생성
+        const labels = [];
+        const now = new Date();
+        for (let i = pointCount - 1; i >= 0; i--) {
+            const timeAgo = new Date(now - i * (1000 * 60 * 60)); // 1시간씩
+            if (period === '1h' || period === '1d') {
+                labels.push(timeAgo.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'}));
+            } else {
+                labels.push(timeAgo.toLocaleDateString('ko-KR', {month: 'short', day: 'numeric'}));
+            }
+        }
+        
+        // 각 코인별 더미 데이터 생성
+        coins.forEach((coin, index) => {
+            const data = [];
+            let value = 0; // 0%에서 시작
+            
+            // 랜덤 워크 생성
+            for (let i = 0; i < pointCount; i++) {
+                value += (Math.random() - 0.5) * 2; // -1% ~ +1% 변동
+                data.push(Math.max(-10, Math.min(10, value))); // -10% ~ +10% 제한
+            }
+            
+            datasets.push({
+                label: `${coin.toUpperCase()} (연결 실패)`,
+                data: data,
+                borderColor: colors[index % colors.length],
+                backgroundColor: colors[index % colors.length] + '20',
+                fill: false,
+                tension: 0.1,
+                pointRadius: getPointRadius(period),
+                pointHoverRadius: getPointRadius(period) + 2,
+                borderDash: [5, 5] // 점선으로 표시하여 더미 데이터임을 표시
+            });
+        });
+        
+        // 차트 업데이트
+        priceChart.data.labels = labels;
+        priceChart.data.datasets = datasets;
+        
+        if (priceChart.options.plugins && priceChart.options.plugins.title) {
+            priceChart.options.plugins.title.text = `${getPeriodDisplayName(period)} 변동률 차트 (연결 실패 - 더미 데이터)`;
+        }
+        
+        priceChart.update();
+        
+        showAlert(`${getPeriodDisplayName(period)} 더미 데이터를 표시합니다 (네트워크 연결 후 새로고침하세요)`, 'info', 6000);
     }
     
     // 신호 배지 클래스
