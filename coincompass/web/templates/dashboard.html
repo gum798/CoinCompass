@@ -28,7 +28,13 @@
                     <div class="mt-3">
                         <small class="text-muted">
                             모니터링 간격: <span id="monitor-interval">{{ settings.interval }}</span>초 | 
+                            API 호출 간격: <span id="api-interval">{{ settings.api_call_interval }}</span>초 | 
                             추적 코인: <span id="monitor-coins">{{ settings.coins|join(', ') }}</span>
+                        </small>
+                        <br>
+                        <small class="text-muted">
+                            <span class="status-indicator" id="api-status"></span>
+                            <span id="api-status-text">API 상태 확인 중...</span>
                         </small>
                     </div>
                 </div>
@@ -384,6 +390,7 @@
             updateMacroIndicators(data.macro_data);
             updatePriceChart(data.prices);
             updateLastUpdateTime(data.timestamp);
+            updateApiStatus(data.api_call_made);
         });
     }
     
@@ -1138,6 +1145,29 @@
     
     // 초기 버튼 상태 설정
     updateMonitoringButtons();
+    
+    // API 상태 업데이트
+    function updateApiStatus(apiCallMade) {
+        const statusIndicator = document.getElementById('api-status');
+        const statusText = document.getElementById('api-status-text');
+        
+        if (apiCallMade) {
+            statusIndicator.className = 'status-indicator bg-success';
+            statusText.textContent = 'API 호출 완료 (최신 데이터)';
+            statusText.style.color = '#198754';
+            
+            // 5초 후 일반 상태로 변경
+            setTimeout(() => {
+                statusIndicator.className = 'status-indicator bg-info';
+                statusText.textContent = 'API 대기 중 (기존 데이터 사용)';
+                statusText.style.color = '#0dcaf0';
+            }, 5000);
+        } else {
+            statusIndicator.className = 'status-indicator bg-info';
+            statusText.textContent = 'API 대기 중 (기존 데이터 사용)';
+            statusText.style.color = '#0dcaf0';
+        }
+    }
     
     // ==================== localStorage 관련 함수들 ====================
     

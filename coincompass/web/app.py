@@ -58,14 +58,17 @@ live_data = {
     'macro_data': {}
 }
 
-# 모니터링 설정
+# 모니터링 설정 (환경변수 기반)
 monitor_settings = {
-    'enabled': True,  # 기본값을 True로 변경
-    'interval': 30,  # seconds
-    'coins': ['bitcoin', 'ethereum', 'ripple', 'cardano', 'solana'],  # 더 많은 코인 추가
+    'enabled': os.getenv('MONITORING_ENABLED', 'true').lower() == 'true',
+    'interval': int(os.getenv('MONITORING_INTERVAL', '1800')),  # 기본 30분 (1800초)
+    'initial_delay': int(os.getenv('MONITORING_INITIAL_DELAY', '60')),  # 시작 후 1분 대기
+    'api_call_enabled': os.getenv('API_CALLS_ENABLED', 'true').lower() == 'true',
+    'api_call_interval': int(os.getenv('API_CALL_INTERVAL', '1800')),  # API 호출 간격 (30분)
+    'coins': os.getenv('MONITORING_COINS', 'bitcoin,ethereum,ripple,cardano,solana').split(','),
     'alerts': {
-        'price_change_threshold': 5.0,
-        'volume_change_threshold': 50.0
+        'price_change_threshold': float(os.getenv('PRICE_ALERT_THRESHOLD', '5.0')),
+        'volume_change_threshold': float(os.getenv('VOLUME_ALERT_THRESHOLD', '50.0'))
     }
 }
 
@@ -75,6 +78,8 @@ class RealTimeMonitor:
     def __init__(self):
         self.running = False
         self.thread = None
+        self.first_run = True
+        self.last_api_call = None
     
     def start(self):
         """모니터링 시작"""
@@ -94,20 +99,33 @@ class RealTimeMonitor:
     
     def _monitor_loop(self):
         """모니터링 루프"""
+        # 초기 지연 시간 적용
+        if self.first_run and monitor_settings.get('initial_delay', 0) > 0:
+            logger.info(f"초기 지연 {monitor_settings['initial_delay']}초 대기 중...")
+            time.sleep(monitor_settings['initial_delay'])
+        
         while self.running:
             try:
-                # 가격 데이터 수집
-                self._update_price_data()
+                now = datetime.now()
+                should_call_api = self._should_call_api(now)
                 
-                # 시장 분석 업데이트
-                self._update_market_analysis()
+                if should_call_api:
+                    logger.info("API 호출 실행 중...")
+                    
+                    # 가격 데이터 수집 (API 호출)
+                    if monitor_settings.get('api_call_enabled', True):
+                        self._update_price_data()
+                        self._update_market_analysis()
+                        self._update_macro_data()
+                        self.last_api_call = now
+                        logger.info(f"API 호출 완료. 다음 호출: {monitor_settings['api_call_interval']}초 후")
+                    else:
+                        logger.info("API 호출이 비활성화되어 있습니다.")
+                else:
+                    # API 호출 없이 기존 데이터로 작업
+                    logger.debug("기존 데이터 사용 중...")
                 
-                # 거시경제 데이터 업데이트 (5분마다)
-                if not live_data['last_update'] or \
-                   (datetime.now() - live_data['last_update']).seconds > 300:
-                    self._update_macro_data()
-                
-                live_data['last_update'] = datetime.now()
+                live_data['last_update'] = now
                 
                 # WebSocket으로 데이터 전송 (Vercel에서는 건너뛰기)
                 if socketio:
@@ -115,16 +133,36 @@ class RealTimeMonitor:
                         'prices': live_data['prices'],
                         'market_analysis': live_data['market_analysis'],
                         'macro_data': live_data['macro_data'],
-                        'timestamp': live_data['last_update'].isoformat()
+                        'timestamp': live_data['last_update'].isoformat(),
+                        'api_call_made': should_call_api
                     })
                 
-                # 알림 체크
-                self._check_alerts()
+                # 알림 체크 (기존 데이터 기반)
+                if live_data['prices']:
+                    self._check_alerts()
+                
+                self.first_run = False
                 
             except Exception as e:
                 logger.error(f"모니터링 오류: {str(e)}")
             
-            time.sleep(monitor_settings['interval'])
+            # 다음 체크까지 대기
+            sleep_time = monitor_settings['interval']
+            logger.debug(f"다음 체크까지 {sleep_time}초 대기...")
+            time.sleep(sleep_time)
+    
+    def _should_call_api(self, now):
+        """API 호출 여부 판단"""
+        if not monitor_settings.get('api_call_enabled', True):
+            return False
+            
+        # 첫 실행이거나 마지막 API 호출이 없는 경우
+        if self.first_run or self.last_api_call is None:
+            return True
+            
+        # 마지막 API 호출 이후 충분한 시간이 경과했는지 확인
+        time_since_last_call = (now - self.last_api_call).total_seconds()
+        return time_since_last_call >= monitor_settings['api_call_interval']
     
     def _update_price_data(self):
         """가격 데이터 업데이트"""
